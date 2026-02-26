@@ -55,17 +55,25 @@ sqlite.exec(`
   );
 `);
 
+// Clear existing data (order matters for FK constraints)
+sqlite.exec(`DELETE FROM submissions`);
+sqlite.exec(`DELETE FROM challenges`);
+sqlite.exec(`DELETE FROM participants`);
+sqlite.exec(`DELETE FROM events`);
+
 // Create default event
 const eventId = nanoid();
 const joinCode = "YUMCTF";
 
 sqlite
   .prepare(
-    `INSERT OR REPLACE INTO events (id, name, join_code, is_active) VALUES (?, ?, ?, 1)`
+    `INSERT INTO events (id, name, join_code, is_active) VALUES (?, ?, ?, 1)`
   )
   .run(eventId, "Yum! Brands AI Coding CTF", joinCode);
 
 console.log(`Created event with join code: ${joinCode}`);
+
+const CHALLENGES_REPO = "https://github.com/ho0haha/2026-offsite-ai-challenges";
 
 // Challenge definitions
 const challenges = [
@@ -83,6 +91,7 @@ const challenges = [
       "Use Cmd+K in Cursor to generate each function body from the docstring",
     ],
     sortOrder: 1,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/01-hello-ai`,
   },
   {
     title: "Bug Squash",
@@ -98,6 +107,7 @@ const challenges = [
       "Try: 'Find all bugs in this file and explain each one'",
     ],
     sortOrder: 2,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/02-bug-squash`,
   },
   {
     title: "The Broken Order System",
@@ -114,6 +124,7 @@ const challenges = [
       "The 5 bugs are: off-by-one in pagination, wrong HTTP status on create, missing quantity validation, tax calculation error, empty cart edge case",
     ],
     sortOrder: 3,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/03-broken-order-system`,
   },
   {
     title: "Production Incident",
@@ -130,6 +141,7 @@ const challenges = [
       "The fix involves proper connection cleanup in the request handler",
     ],
     sortOrder: 4,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/04-production-incident`,
   },
   {
     title: "Spaghetti Untangler",
@@ -146,6 +158,7 @@ const challenges = [
       "Use Cursor's select-and-refactor to extract functions one at a time",
     ],
     sortOrder: 5,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/05-spaghetti-untangler`,
   },
   {
     title: "Test Factory",
@@ -162,6 +175,7 @@ const challenges = [
       "Use the iterative loop: write tests → run coverage → see gaps → write more",
     ],
     sortOrder: 6,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/06-test-factory`,
   },
   {
     title: "Spec Builder + Build",
@@ -178,6 +192,7 @@ const challenges = [
       "For Phase 2, paste your PRD back into Claude Code and ask it to build the implementation",
     ],
     sortOrder: 7,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/07-spec-builder`,
   },
   {
     title: "AI Menu Assistant",
@@ -194,6 +209,7 @@ const challenges = [
       "Test with questions about prices, allergens, and ingredients",
     ],
     sortOrder: 8,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/08-ai-menu-assistant`,
   },
   {
     title: "Smart Feedback Sorter",
@@ -210,6 +226,7 @@ const challenges = [
       "If accuracy is below 85%, tweak your prompt and re-run",
     ],
     sortOrder: 9,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/09-smart-feedback-sorter`,
   },
   {
     title: "Context is King",
@@ -226,6 +243,7 @@ const challenges = [
       "Consider creating a CLAUDE.md file to help Cursor understand the project structure",
     ],
     sortOrder: 10,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/10-context-is-king`,
   },
   {
     title: "Prompt Craftsman",
@@ -242,6 +260,7 @@ const challenges = [
       "Use Cursor's Cmd+K for rapid iteration on each prompt",
     ],
     sortOrder: 11,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/11-prompt-craftsman`,
   },
   {
     title: "Full Stack Sprint",
@@ -258,6 +277,7 @@ const challenges = [
       "The Haversine formula is needed for distance calculations",
     ],
     sortOrder: 12,
+    starterUrl: `${CHALLENGES_REPO}/tree/main/12-full-stack-sprint`,
   },
 ];
 
@@ -281,7 +301,7 @@ const insertAll = sqlite.transaction(() => {
       ch.tool,
       JSON.stringify(ch.hints),
       ch.sortOrder,
-      null
+      ch.starterUrl || null
     );
   }
 });

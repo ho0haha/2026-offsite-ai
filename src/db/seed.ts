@@ -1,3 +1,6 @@
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 import { createClient } from "@libsql/client";
 import { nanoid } from "nanoid";
 

@@ -6,3 +6,5 @@ data/
 /challenges/
 temp-next/
 .claude/
+
+.vercel

@@ -27,7 +27,7 @@ export function validateCh7(files: Map<string, string>): { valid: boolean; detai
   if (!acceptanceSection) {
     details.push("Missing 'Acceptance Criteria' section");
   } else {
-    const criteria = acceptanceSection.match(/^[\s]*[-*\d+.]\s+.+/gm) || [];
+    const criteria = acceptanceSection.match(/^\s*(?:[-*+]|\d+[.)]\s).+/gm) || [];
     if (criteria.length < 5) {
       details.push(`Found ${criteria.length} acceptance criteria, need at least 5`);
     }

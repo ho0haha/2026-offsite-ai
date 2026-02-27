@@ -30,6 +30,8 @@ export const challenges = sqliteTable("challenges", {
   hints: text("hints"),
   sortOrder: integer("sort_order").default(0),
   starterUrl: text("starter_url"),
+  validationType: text("validation_type").default("flag"),
+  requiredFiles: text("required_files"),
 });
 
 export const submissions = sqliteTable("submissions", {

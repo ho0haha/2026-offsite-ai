@@ -13,7 +13,7 @@
 
 - [ ] Seed the database: `npm run db:seed`
 - [ ] Start the platform: `npm run dev` (or verify Vercel deployment)
-- [ ] Open `/admin` — confirm event is **Active** with join code **YUMCTF**
+- [ ] Open `/admin` — confirm event is **Active** with join code ** **
 - [ ] Open `/leaderboard` on the projector screen
 - [ ] Verify join flow: go to `/` on your phone, enter name + YUMCTF, see challenges
 - [ ] Have the Claude API key ready to share: `export ANTHROPIC_API_KEY=sk-ant-...`

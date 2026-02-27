@@ -1,81 +1,8 @@
-import Database from "better-sqlite3";
-import path from "path";
-import fs from "fs";
+import { createClient } from "@libsql/client";
 import { nanoid } from "nanoid";
-
-const dataDir = path.join(process.cwd(), "data");
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-
-const dbPath = path.join(dataDir, "ctf.db");
-const sqlite = new Database(dbPath);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
-
-// Create tables
-sqlite.exec(`
-  CREATE TABLE IF NOT EXISTS events (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    join_code TEXT UNIQUE NOT NULL,
-    starts_at TEXT,
-    ends_at TEXT,
-    is_active INTEGER DEFAULT 0
-  );
-  CREATE TABLE IF NOT EXISTS participants (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    event_id TEXT REFERENCES events(id),
-    joined_at TEXT DEFAULT (datetime('now')),
-    total_points INTEGER DEFAULT 0
-  );
-  CREATE TABLE IF NOT EXISTS challenges (
-    id TEXT PRIMARY KEY,
-    event_id TEXT REFERENCES events(id),
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
-    category TEXT NOT NULL,
-    difficulty TEXT NOT NULL,
-    points INTEGER NOT NULL,
-    flag TEXT NOT NULL,
-    tool TEXT NOT NULL,
-    hints TEXT,
-    sort_order INTEGER DEFAULT 0,
-    starter_url TEXT
-  );
-  CREATE TABLE IF NOT EXISTS submissions (
-    id TEXT PRIMARY KEY,
-    participant_id TEXT REFERENCES participants(id),
-    challenge_id TEXT REFERENCES challenges(id),
-    submitted_flag TEXT NOT NULL,
-    is_correct INTEGER NOT NULL,
-    points_awarded INTEGER DEFAULT 0,
-    submitted_at TEXT DEFAULT (datetime('now'))
-  );
-`);
-
-// Clear existing data (order matters for FK constraints)
-sqlite.exec(`DELETE FROM submissions`);
-sqlite.exec(`DELETE FROM challenges`);
-sqlite.exec(`DELETE FROM participants`);
-sqlite.exec(`DELETE FROM events`);
-
-// Create default event
-const eventId = nanoid();
-const joinCode = "YUMCTF";
-
-sqlite
-  .prepare(
-    `INSERT INTO events (id, name, join_code, is_active) VALUES (?, ?, ?, 1)`
-  )
-  .run(eventId, "Yum! Brands AI Coding CTF", joinCode);
-
-console.log(`Created event with join code: ${joinCode}`);
 
 const CHALLENGES_REPO = "https://github.com/ho0haha/2026-offsite-ai-challenges";
 
-// Challenge definitions
 const challenges = [
   {
     title: "Hello AI",
@@ -92,6 +19,8 @@ const challenges = [
     ],
     sortOrder: 1,
     starterUrl: `${CHALLENGES_REPO}/tree/main/01-hello-ai`,
+    validationType: "upload",
+    requiredFiles: ["starter.py"],
   },
   {
     title: "Bug Squash",
@@ -108,6 +37,8 @@ const challenges = [
     ],
     sortOrder: 2,
     starterUrl: `${CHALLENGES_REPO}/tree/main/02-bug-squash`,
+    validationType: "upload",
+    requiredFiles: ["buggy_script.py"],
   },
   {
     title: "The Broken Order System",
@@ -125,6 +56,8 @@ const challenges = [
     ],
     sortOrder: 3,
     starterUrl: `${CHALLENGES_REPO}/tree/main/03-broken-order-system`,
+    validationType: "upload",
+    requiredFiles: ["app/routes.py", "app/utils.py", "app/models.py"],
   },
   {
     title: "Production Incident",
@@ -142,6 +75,8 @@ const challenges = [
     ],
     sortOrder: 4,
     starterUrl: `${CHALLENGES_REPO}/tree/main/04-production-incident`,
+    validationType: "server",
+    requiredFiles: ["app/server.py"],
   },
   {
     title: "Spaghetti Untangler",
@@ -159,6 +94,8 @@ const challenges = [
     ],
     sortOrder: 5,
     starterUrl: `${CHALLENGES_REPO}/tree/main/05-spaghetti-untangler`,
+    validationType: "server",
+    requiredFiles: ["order_processor.py"],
   },
   {
     title: "Test Factory",
@@ -176,6 +113,8 @@ const challenges = [
     ],
     sortOrder: 6,
     starterUrl: `${CHALLENGES_REPO}/tree/main/06-test-factory`,
+    validationType: "upload",
+    requiredFiles: ["test_inventory.py"],
   },
   {
     title: "Spec Builder + Build",
@@ -193,6 +132,8 @@ const challenges = [
     ],
     sortOrder: 7,
     starterUrl: `${CHALLENGES_REPO}/tree/main/07-spec-builder`,
+    validationType: "server",
+    requiredFiles: ["prd.md"],
   },
   {
     title: "AI Menu Assistant",
@@ -210,6 +151,8 @@ const challenges = [
     ],
     sortOrder: 8,
     starterUrl: `${CHALLENGES_REPO}/tree/main/08-ai-menu-assistant`,
+    validationType: "upload",
+    requiredFiles: ["chatbot.py"],
   },
   {
     title: "Smart Feedback Sorter",
@@ -227,6 +170,8 @@ const challenges = [
     ],
     sortOrder: 9,
     starterUrl: `${CHALLENGES_REPO}/tree/main/09-smart-feedback-sorter`,
+    validationType: "server",
+    requiredFiles: ["output.csv"],
   },
   {
     title: "Context is King",
@@ -244,6 +189,15 @@ const challenges = [
     ],
     sortOrder: 10,
     starterUrl: `${CHALLENGES_REPO}/tree/main/10-context-is-king`,
+    validationType: "upload",
+    requiredFiles: [
+      "restaurant_system/config.py",
+      "restaurant_system/customer_service.py",
+      "restaurant_system/order_service.py",
+      "restaurant_system/payment_service.py",
+      "restaurant_system/reporting.py",
+      "restaurant_system/formatters.py",
+    ],
   },
   {
     title: "Prompt Craftsman",
@@ -261,6 +215,14 @@ const challenges = [
     ],
     sortOrder: 11,
     starterUrl: `${CHALLENGES_REPO}/tree/main/11-prompt-craftsman`,
+    validationType: "server",
+    requiredFiles: [
+      "outputs/output1.md",
+      "outputs/output2.md",
+      "outputs/output3.md",
+      "outputs/output4.md",
+      "outputs/output5.md",
+    ],
   },
   {
     title: "Full Stack Sprint",
@@ -278,18 +240,91 @@ const challenges = [
     ],
     sortOrder: 12,
     starterUrl: `${CHALLENGES_REPO}/tree/main/12-full-stack-sprint`,
+    validationType: "upload",
+    requiredFiles: ["app/main.py"],
   },
 ];
 
-// Insert challenges
-const insertChallenge = sqlite.prepare(`
-  INSERT OR REPLACE INTO challenges (id, event_id, title, description, category, difficulty, points, flag, tool, hints, sort_order, starter_url)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`);
+async function main() {
+  const client = createClient({
+    url: process.env.TURSO_CONNECTION_URL!,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
 
-const insertAll = sqlite.transaction(() => {
-  for (const ch of challenges) {
-    insertChallenge.run(
+  // Create tables
+  await client.batch(
+    [
+      `CREATE TABLE IF NOT EXISTS events (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        join_code TEXT UNIQUE NOT NULL,
+        starts_at TEXT,
+        ends_at TEXT,
+        is_active INTEGER DEFAULT 0
+      )`,
+      `CREATE TABLE IF NOT EXISTS participants (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        event_id TEXT REFERENCES events(id),
+        joined_at TEXT DEFAULT (datetime('now')),
+        total_points INTEGER DEFAULT 0
+      )`,
+      `CREATE TABLE IF NOT EXISTS challenges (
+        id TEXT PRIMARY KEY,
+        event_id TEXT REFERENCES events(id),
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        category TEXT NOT NULL,
+        difficulty TEXT NOT NULL,
+        points INTEGER NOT NULL,
+        flag TEXT NOT NULL,
+        tool TEXT NOT NULL,
+        hints TEXT,
+        sort_order INTEGER DEFAULT 0,
+        starter_url TEXT,
+        validation_type TEXT DEFAULT 'flag',
+        required_files TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS submissions (
+        id TEXT PRIMARY KEY,
+        participant_id TEXT REFERENCES participants(id),
+        challenge_id TEXT REFERENCES challenges(id),
+        submitted_flag TEXT NOT NULL,
+        is_correct INTEGER NOT NULL,
+        points_awarded INTEGER DEFAULT 0,
+        submitted_at TEXT DEFAULT (datetime('now'))
+      )`,
+    ],
+    "write"
+  );
+
+  // Clear existing data
+  await client.batch(
+    [
+      "DELETE FROM submissions",
+      "DELETE FROM challenges",
+      "DELETE FROM participants",
+      "DELETE FROM events",
+    ],
+    "write"
+  );
+
+  // Create default event
+  const eventId = nanoid();
+  const joinCode = "YUMCTF";
+
+  await client.execute({
+    sql: "INSERT INTO events (id, name, join_code, is_active) VALUES (?, ?, ?, 1)",
+    args: [eventId, "Yum! Brands AI Coding CTF", joinCode],
+  });
+
+  console.log(`Created event with join code: ${joinCode}`);
+
+  // Insert challenges
+  const stmts = challenges.map((ch) => ({
+    sql: `INSERT OR REPLACE INTO challenges (id, event_id, title, description, category, difficulty, points, flag, tool, hints, sort_order, starter_url, validation_type, required_files)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
       nanoid(),
       eventId,
       ch.title,
@@ -301,17 +336,24 @@ const insertAll = sqlite.transaction(() => {
       ch.tool,
       JSON.stringify(ch.hints),
       ch.sortOrder,
-      ch.starterUrl || null
-    );
-  }
+      ch.starterUrl || null,
+      ch.validationType || "flag",
+      ch.requiredFiles ? JSON.stringify(ch.requiredFiles) : null,
+    ],
+  }));
+
+  await client.batch(stmts, "write");
+
+  console.log(`Seeded ${challenges.length} challenges`);
+  console.log(`\nEvent: Yum! Brands AI Coding CTF`);
+  console.log(`Join Code: ${joinCode}`);
+  console.log(`Status: Active`);
+  console.log(`\nRun 'npm run dev' to start the server`);
+
+  client.close();
+}
+
+main().catch((err) => {
+  console.error("Seed failed:", err);
+  process.exit(1);
 });
-
-insertAll();
-
-console.log(`Seeded ${challenges.length} challenges`);
-console.log(`\nEvent: Yum! Brands AI Coding CTF`);
-console.log(`Join Code: ${joinCode}`);
-console.log(`Status: Active`);
-console.log(`\nRun 'npm run dev' to start the server`);
-
-sqlite.close();

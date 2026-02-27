@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { challenges, submissions, participants } from "@/db/schema";
+import { challenges, submissions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { sseBroadcaster } from "@/lib/sse";
+import { verifyToken } from "@/lib/crypto";
+import { creditChallenge } from "@/lib/credit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,8 +17,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get the challenge
-    const challenge = db
+    const trimmedFlag = flag.trim();
+
+    // Token verification path: if flag starts with "CTF:", treat as HMAC token
+    if (trimmedFlag.startsWith("CTF:")) {
+      const tokenData = verifyToken(trimmedFlag);
+      if (!tokenData) {
+        return NextResponse.json({
+          correct: false,
+          alreadySolved: false,
+          pointsAwarded: 0,
+          message: "Invalid or expired token.",
+        });
+      }
+
+      if (tokenData.participantId !== participantId) {
+        return NextResponse.json({
+          correct: false,
+          alreadySolved: false,
+          pointsAwarded: 0,
+          message: "Token does not match your session.",
+        });
+      }
+
+      const result = await creditChallenge(participantId, tokenData.challengeId, `token:${trimmedFlag}`);
+      if (!result.success) {
+        return NextResponse.json({ correct: false, alreadySolved: false, pointsAwarded: 0, message: result.message });
+      }
+      if (result.alreadySolved) {
+        return NextResponse.json({ correct: true, alreadySolved: true, message: result.message });
+      }
+      return NextResponse.json({
+        correct: true,
+        alreadySolved: false,
+        pointsAwarded: result.pointsAwarded,
+        message: result.message,
+      });
+    }
+
+    // Legacy flag comparison path
+    const challenge = await db
       .select()
       .from(challenges)
       .where(eq(challenges.id, challengeId))
@@ -30,90 +69,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if already solved
-    const alreadySolved = db
-      .select()
-      .from(submissions)
-      .where(
-        and(
-          eq(submissions.participantId, participantId),
-          eq(submissions.challengeId, challengeId),
-          eq(submissions.isCorrect, true)
-        )
-      )
-      .get();
+    const isCorrect =
+      trimmedFlag.toLowerCase() === challenge.flag.toLowerCase();
 
-    if (alreadySolved) {
+    if (isCorrect) {
+      // Use shared credit logic (records submission, updates points)
+      const result = await creditChallenge(participantId, challengeId, trimmedFlag);
+      if (!result.success) {
+        return NextResponse.json({ correct: false, alreadySolved: false, pointsAwarded: 0, message: result.message });
+      }
+      if (result.alreadySolved) {
+        return NextResponse.json({ correct: true, alreadySolved: true, message: result.message });
+      }
       return NextResponse.json({
         correct: true,
-        alreadySolved: true,
-        message: "You already solved this challenge!",
+        alreadySolved: false,
+        pointsAwarded: result.pointsAwarded,
+        message: result.message,
       });
     }
 
-    // Check the flag
-    const isCorrect =
-      flag.trim().toLowerCase() === challenge.flag.toLowerCase();
-    const pointsAwarded = isCorrect ? challenge.points : 0;
-
-    // Record submission
-    db.insert(submissions)
+    // Incorrect flag — record the wrong submission
+    await db.insert(submissions)
       .values({
         id: nanoid(),
         participantId,
         challengeId,
-        submittedFlag: flag.trim(),
-        isCorrect,
-        pointsAwarded,
+        submittedFlag: trimmedFlag,
+        isCorrect: false,
+        pointsAwarded: 0,
         submittedAt: new Date().toISOString(),
       })
       .run();
 
-    // Update participant total points if correct
-    if (isCorrect) {
-      const participant = db
-        .select()
-        .from(participants)
-        .where(eq(participants.id, participantId))
-        .get();
-
-      if (participant) {
-        db.update(participants)
-          .set({ totalPoints: (participant.totalPoints ?? 0) + pointsAwarded })
-          .where(eq(participants.id, participantId))
-          .run();
-
-        // Broadcast leaderboard update
-        const leaderboard = db
-          .select({
-            id: participants.id,
-            name: participants.name,
-            totalPoints: participants.totalPoints,
-          })
-          .from(participants)
-          .where(eq(participants.eventId, participant.eventId!))
-          .orderBy(participants.totalPoints)
-          .all()
-          .reverse();
-
-        sseBroadcaster.broadcast("leaderboard-update", {
-          leaderboard,
-          solve: {
-            participantName: participant.name,
-            challengeTitle: challenge.title,
-            points: pointsAwarded,
-          },
-        });
-      }
-    }
-
     return NextResponse.json({
-      correct: isCorrect,
+      correct: false,
       alreadySolved: false,
-      pointsAwarded,
-      message: isCorrect
-        ? `Correct! +${pointsAwarded} points!`
-        : "Incorrect flag. Try again!",
+      pointsAwarded: 0,
+      message: "Incorrect flag. Try again!",
     });
   } catch {
     return NextResponse.json(

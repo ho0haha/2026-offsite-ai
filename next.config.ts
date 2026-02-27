@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["better-sqlite3"],
+  outputFileTracingIncludes: {
+    "/api/validate": ["./data/stubs/**", "./data/ground_truth/**"],
+  },
 };
 
 export default nextConfig;

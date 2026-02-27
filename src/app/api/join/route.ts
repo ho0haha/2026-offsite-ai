@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find active event with this join code
-    const event = db
+    const event = await db
       .select()
       .from(events)
       .where(and(eq(events.joinCode, joinCode.trim().toUpperCase()), eq(events.isActive, true)))
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if participant already exists
-    const existing = db
+    const existing = await db
       .select()
       .from(participants)
       .where(
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       totalPoints: 0,
     };
 
-    db.insert(participants).values(participant).run();
+    await db.insert(participants).values(participant).run();
 
     return NextResponse.json({
       participant,

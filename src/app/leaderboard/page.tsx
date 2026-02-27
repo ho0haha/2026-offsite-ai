@@ -1,18 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 
 type LeaderboardEntry = {
   id: string;
   name: string;
   totalPoints: number | null;
-};
-
-type SolveEvent = {
-  participantName: string;
-  challengeTitle: string;
-  points: number;
 };
 
 export default function LeaderboardPage() {
@@ -34,43 +28,30 @@ function LeaderboardContent() {
   const [eventName, setEventName] = useState("");
   const [endsAt, setEndsAt] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState("");
-  const [recentSolve, setRecentSolve] = useState<SolveEvent | null>(null);
   const [connected, setConnected] = useState(false);
   const [confetti, setConfetti] = useState(false);
   const prevRanksRef = useRef<Map<string, number>>(new Map());
+  const prevPointsRef = useRef<Map<string, number>>(new Map());
   const [changedIds, setChangedIds] = useState<Set<string>>(new Set());
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    // Get eventId from query params or localStorage
-    let eventId = searchParams.get("eventId");
-    if (!eventId) {
-      const stored = localStorage.getItem("ctf-event");
-      if (stored) {
-        eventId = JSON.parse(stored).id;
-      }
-    }
-    if (!eventId) return;
+  const fetchLeaderboard = useCallback(async (eventId: string) => {
+    try {
+      const res = await fetch(`/api/leaderboard?eventId=${eventId}`);
+      if (!res.ok) throw new Error("fetch failed");
+      const data = await res.json();
 
-    const es = new EventSource(`/api/leaderboard?eventId=${eventId}`);
-
-    es.addEventListener("init", (e) => {
-      const data = JSON.parse(e.data);
-      setLeaderboard(data.leaderboard);
       if (data.event) {
         setEventName(data.event.name);
         setEndsAt(data.event.endsAt);
       }
-      setConnected(true);
-    });
-
-    es.addEventListener("leaderboard-update", (e) => {
-      const data = JSON.parse(e.data);
 
       // Track rank changes for animation
       const newRanks = new Map<string, number>();
+      const newPoints = new Map<string, number>();
       data.leaderboard.forEach((entry: LeaderboardEntry, idx: number) => {
         newRanks.set(entry.id, idx);
+        newPoints.set(entry.id, entry.totalPoints ?? 0);
       });
 
       const changed = new Set<string>();
@@ -81,26 +62,52 @@ function LeaderboardContent() {
         }
       });
 
+      // Detect point increases for confetti
+      let pointsIncreased = false;
+      newPoints.forEach((pts, id) => {
+        const oldPts = prevPointsRef.current.get(id);
+        if (oldPts !== undefined && pts > oldPts) {
+          pointsIncreased = true;
+        }
+      });
+
       prevRanksRef.current = newRanks;
-      setChangedIds(changed);
-      setTimeout(() => setChangedIds(new Set()), 1000);
+      prevPointsRef.current = newPoints;
 
-      setLeaderboard(data.leaderboard);
+      if (changed.size > 0) {
+        setChangedIds(changed);
+        setTimeout(() => setChangedIds(new Set()), 1000);
+      }
 
-      if (data.solve) {
-        setRecentSolve(data.solve);
+      if (pointsIncreased) {
         setConfetti(true);
-        setTimeout(() => setRecentSolve(null), 5000);
         setTimeout(() => setConfetti(false), 3000);
       }
-    });
 
-    es.onerror = () => {
+      setLeaderboard(data.leaderboard);
+      setConnected(true);
+    } catch {
       setConnected(false);
-    };
+    }
+  }, []);
 
-    return () => es.close();
-  }, [searchParams]);
+  useEffect(() => {
+    let eventId = searchParams.get("eventId");
+    if (!eventId) {
+      const stored = localStorage.getItem("ctf-event");
+      if (stored) {
+        eventId = JSON.parse(stored).id;
+      }
+    }
+    if (!eventId) return;
+
+    // Initial fetch
+    fetchLeaderboard(eventId);
+
+    // Poll every 3 seconds
+    const interval = setInterval(() => fetchLeaderboard(eventId), 3000);
+    return () => clearInterval(interval);
+  }, [searchParams, fetchLeaderboard]);
 
   // Countdown timer
   useEffect(() => {
@@ -179,7 +186,7 @@ function LeaderboardContent() {
             }`}
           />
           <span className="text-xs text-muted-foreground">
-            {connected ? "Live" : "Reconnecting..."}
+            {connected ? "Connected" : "Disconnected"}
           </span>
         </div>
       </header>
@@ -197,24 +204,6 @@ function LeaderboardContent() {
             {timeLeft}
           </div>
           <p className="text-sm text-muted-foreground mt-1">remaining</p>
-        </div>
-      )}
-
-      {/* Recent Solve Banner */}
-      {recentSolve && (
-        <div className="mx-auto max-w-3xl w-full px-4 mb-4">
-          <div className="bg-primary/20 border border-primary/30 rounded-lg p-3 text-center animate-solve-flash">
-            <span className="text-primary font-semibold">
-              {recentSolve.participantName}
-            </span>{" "}
-            solved{" "}
-            <span className="font-semibold">{recentSolve.challengeTitle}</span>{" "}
-            for{" "}
-            <span className="text-primary font-bold">
-              +{recentSolve.points}
-            </span>{" "}
-            points!
-          </div>
         </div>
       )}
 

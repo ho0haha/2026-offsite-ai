@@ -8,14 +8,13 @@ import {
 } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { sseBroadcaster } from "@/lib/sse";
 
 // GET: Fetch all admin data
 export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get("action");
 
   if (action === "events") {
-    const allEvents = db.select().from(events).all();
+    const allEvents = await db.select().from(events).all();
     return NextResponse.json(allEvents);
   }
 
@@ -27,7 +26,7 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
-    const allChallenges = db
+    const allChallenges = await db
       .select()
       .from(challenges)
       .where(eq(challenges.eventId, eventId))
@@ -44,12 +43,12 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
-    const allParticipants = db
+    const allParticipants = (await db
       .select()
       .from(participants)
       .where(eq(participants.eventId, eventId))
       .orderBy(participants.totalPoints)
-      .all()
+      .all())
       .reverse();
     return NextResponse.json(allParticipants);
   }
@@ -62,7 +61,7 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
-    const allSubmissions = db
+    const allSubmissions = (await db
       .select({
         id: submissions.id,
         participantId: submissions.participantId,
@@ -79,7 +78,7 @@ export async function GET(req: NextRequest) {
       .innerJoin(challenges, eq(submissions.challengeId, challenges.id))
       .where(eq(participants.eventId, eventId))
       .orderBy(submissions.submittedAt)
-      .all()
+      .all())
       .reverse();
     return NextResponse.json(allSubmissions);
   }
@@ -104,14 +103,14 @@ export async function POST(req: NextRequest) {
         endsAt: endsAt || null,
         isActive: false,
       };
-      db.insert(events).values(event).run();
+      await db.insert(events).values(event).run();
       return NextResponse.json(event);
     }
 
     // Toggle event active
     if (action === "toggle-event") {
       const { eventId, isActive } = body;
-      db.update(events)
+      await db.update(events)
         .set({ isActive })
         .where(eq(events.id, eventId))
         .run();
@@ -125,7 +124,7 @@ export async function POST(req: NextRequest) {
       if (startsAt !== undefined) updates.startsAt = startsAt;
       if (endsAt !== undefined) updates.endsAt = endsAt;
       if (name !== undefined) updates.name = name;
-      db.update(events)
+      await db.update(events)
         .set(updates)
         .where(eq(events.id, eventId))
         .run();
@@ -148,7 +147,7 @@ export async function POST(req: NextRequest) {
         sortOrder: body.sortOrder || 0,
         starterUrl: body.starterUrl || null,
       };
-      db.insert(challenges).values(challenge).run();
+      await db.insert(challenges).values(challenge).run();
       return NextResponse.json(challenge);
     }
 
@@ -157,7 +156,7 @@ export async function POST(req: NextRequest) {
       const { challengeId, ...updates } = body;
       if (updates.hints) updates.hints = JSON.stringify(updates.hints);
       delete updates.action;
-      db.update(challenges)
+      await db.update(challenges)
         .set(updates)
         .where(eq(challenges.id, challengeId))
         .run();
@@ -167,7 +166,7 @@ export async function POST(req: NextRequest) {
     // Manual point override
     if (action === "override-points") {
       const { participantId, points, reason } = body;
-      const participant = db
+      const participant = await db
         .select()
         .from(participants)
         .where(eq(participants.id, participantId))
@@ -180,13 +179,13 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      db.update(participants)
+      await db.update(participants)
         .set({ totalPoints: (participant.totalPoints ?? 0) + points })
         .where(eq(participants.id, participantId))
         .run();
 
       // Record as a special submission
-      db.insert(submissions)
+      await db.insert(submissions)
         .values({
           id: nanoid(),
           participantId,
@@ -197,21 +196,6 @@ export async function POST(req: NextRequest) {
           submittedAt: new Date().toISOString(),
         })
         .run();
-
-      // Broadcast update
-      const leaderboard = db
-        .select({
-          id: participants.id,
-          name: participants.name,
-          totalPoints: participants.totalPoints,
-        })
-        .from(participants)
-        .where(eq(participants.eventId, participant.eventId!))
-        .orderBy(participants.totalPoints)
-        .all()
-        .reverse();
-
-      sseBroadcaster.broadcast("leaderboard-update", { leaderboard });
 
       return NextResponse.json({ success: true });
     }

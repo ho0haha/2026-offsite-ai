@@ -9,8 +9,22 @@ import {
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
+function checkAuth(req: NextRequest) {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret) {
+    return NextResponse.json({ error: "Admin not configured" }, { status: 500 });
+  }
+  const auth = req.headers.get("authorization");
+  if (auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return null;
+}
+
 // GET: Fetch all admin data
 export async function GET(req: NextRequest) {
+  const authError = checkAuth(req);
+  if (authError) return authError;
   const action = req.nextUrl.searchParams.get("action");
 
   if (action === "events") {
@@ -88,6 +102,9 @@ export async function GET(req: NextRequest) {
 
 // POST: Admin actions
 export async function POST(req: NextRequest) {
+  const authError = checkAuth(req);
+  if (authError) return authError;
+
   try {
     const body = await req.json();
     const { action } = body;

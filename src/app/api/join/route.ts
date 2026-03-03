@@ -4,10 +4,21 @@ import { events, participants } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { generateSessionToken } from "@/lib/crypto";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, joinCode } = await req.json();
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    const rl = checkRateLimit(`join:${ip}`, 5, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many attempts. Try again shortly." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
+
+    const { name, joinCode, secretKey } = await req.json();
 
     if (!name?.trim() || !joinCode?.trim()) {
       return NextResponse.json(
@@ -43,30 +54,51 @@ export async function POST(req: NextRequest) {
       .get();
 
     if (existing) {
+      // Existing participant — require secret key
+      if (!secretKey?.trim()) {
+        return NextResponse.json({
+          error: "This name is already registered. Enter your secret key to log back in.",
+          requiresSecretKey: true,
+        }, { status: 401 });
+      }
+
+      if (existing.secretKey !== secretKey.trim()) {
+        return NextResponse.json({
+          error: "Incorrect secret key.",
+          requiresSecretKey: true,
+        }, { status: 401 });
+      }
+
+      // Secret key matches — issue token
       const token = generateSessionToken(existing.id, event.id);
       return NextResponse.json({
-        participant: existing,
+        participant: { id: existing.id, name: existing.name, eventId: existing.eventId, joinedAt: existing.joinedAt, totalPoints: existing.totalPoints },
         event: { id: event.id, name: event.name },
         token,
+        isNew: false,
       });
     }
 
-    // Create new participant
+    // New participant — create with generated secret key
+    const generatedKey = nanoid(12);
     const participant = {
       id: nanoid(),
       name: name.trim(),
       eventId: event.id,
       joinedAt: new Date().toISOString(),
       totalPoints: 0,
+      secretKey: generatedKey,
     };
 
     await db.insert(participants).values(participant).run();
 
     const token = generateSessionToken(participant.id, event.id);
     return NextResponse.json({
-      participant,
+      participant: { id: participant.id, name: participant.name, eventId: participant.eventId, joinedAt: participant.joinedAt, totalPoints: participant.totalPoints },
       event: { id: event.id, name: event.name },
       token,
+      secretKey: generatedKey,
+      isNew: true,
     });
   } catch {
     return NextResponse.json(

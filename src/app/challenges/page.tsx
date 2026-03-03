@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { TIER_BADGES } from "@/lib/tier-badges";
 
 type Challenge = {
   id: string;
@@ -39,13 +40,9 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   legendary: "bg-pink-500/20 text-pink-400",
 };
 
-const TIER_COLORS: Record<number, string> = {
-  1: "text-green-400",
-  2: "text-yellow-400",
-  3: "text-red-400",
-  4: "text-purple-400",
-  5: "text-pink-400",
-};
+function getBadge(tier: number) {
+  return TIER_BADGES[Math.max(0, Math.min(tier - 1, TIER_BADGES.length - 1))];
+}
 
 export default function ChallengesPage() {
   const [tiers, setTiers] = useState<TierGroup[]>([]);
@@ -152,42 +149,63 @@ export default function ChallengesPage() {
     }
   }
 
+  const currentBadge = progress ? getBadge(progress.currentMaxTier) : getBadge(1);
+
   return (
     <div className="min-h-screen">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b border-border">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">
-              <span className="text-primary">AI Coding</span> CTF
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Welcome, {participant?.name}
-            </p>
+          <div className="flex items-center gap-3">
+            {/* Current tier badge */}
+            {progress && (
+              <img
+                src={currentBadge.image}
+                alt={currentBadge.name}
+                width={48}
+                height={48}
+                className="rounded-lg"
+              />
+            )}
+            <div>
+              <h1 className="text-xl font-bold">
+                <span className="text-primary">AI Coding</span> CTF
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                Welcome, {participant?.name}
+                {progress && (
+                  <span className={`ml-2 ${currentBadge.color} font-medium`}>
+                    {currentBadge.name}
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             {/* Tier Progress */}
             {progress && (
-              <div className="flex items-center gap-3">
-                {[1, 2, 3, 4, 5].map((t) => {
+              <div className="hidden sm:flex items-center gap-2">
+                {[1, 2, 3, 4, 5, 6, 7].map((t) => {
                   const solved = progress.solvesByTier[String(t)] || 0;
                   const total = progress.totalByTier[String(t)] || 0;
                   const unlocked = t <= progress.currentMaxTier;
+                  const b = getBadge(t);
                   return (
                     <div
                       key={t}
                       className={`text-center ${
                         unlocked ? "" : "opacity-40"
                       }`}
+                      title={b.name}
                     >
-                      <div
-                        className={`text-xs font-medium ${
-                          TIER_COLORS[t] || ""
-                        }`}
-                      >
-                        T{t}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
+                      <img
+                        src={b.imageSm}
+                        alt={b.name}
+                        width={24}
+                        height={24}
+                        className="rounded mx-auto"
+                      />
+                      <div className="text-[10px] text-muted-foreground">
                         {solved}/{total}
                       </div>
                     </div>
@@ -217,282 +235,295 @@ export default function ChallengesPage() {
           <p className="text-green-400 font-semibold mb-2">
             New challenges unlocked!
           </p>
-          {unlockNotification.map((ch) => (
-            <p key={ch.id} className="text-sm text-green-300">
-              Tier {ch.tier}: {ch.title}
-            </p>
-          ))}
+          {unlockNotification.map((ch) => {
+            const b = getBadge(ch.tier);
+            return (
+              <p key={ch.id} className="text-sm text-green-300 flex items-center gap-2">
+                <img src={b.imageSm} alt="" width={20} height={20} className="rounded" />
+                Tier {ch.tier}: {ch.title}
+              </p>
+            );
+          })}
         </div>
       )}
 
       {/* Challenge Cards by Tier */}
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
-        {tiers.map((tierGroup) => (
-          <section key={tierGroup.tier}>
-            <div className="flex items-center gap-3 mb-3">
-              <h2
-                className={`text-lg font-semibold ${
-                  TIER_COLORS[tierGroup.tier] || ""
-                }`}
-              >
-                Tier {tierGroup.tier}
-              </h2>
+        {tiers.map((tierGroup) => {
+          const badge = getBadge(tierGroup.tier);
+          return (
+            <section key={tierGroup.tier}>
+              <div className="flex items-center gap-3 mb-3">
+                <img
+                  src={badge.imageSm}
+                  alt={badge.name}
+                  width={32}
+                  height={32}
+                  className={`rounded ${!tierGroup.unlocked ? "opacity-40 grayscale" : ""}`}
+                />
+                <h2 className={`text-lg font-semibold ${badge.color}`}>
+                  Tier {tierGroup.tier}
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    {badge.name}
+                  </span>
+                </h2>
+                {tierGroup.unlocked ? (
+                  <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
+                    Unlocked
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-xs bg-zinc-500/20 text-zinc-400">
+                    Locked
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  {tierGroup.unlockRule}
+                </span>
+              </div>
+
               {tierGroup.unlocked ? (
-                <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
-                  Unlocked
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded text-xs bg-zinc-500/20 text-zinc-400">
-                  Locked
-                </span>
-              )}
-              <span className="text-xs text-muted-foreground">
-                {tierGroup.unlockRule}
-              </span>
-            </div>
-
-            {tierGroup.unlocked ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {tierGroup.challenges.map((ch) => (
-                  <div
-                    key={ch.id}
-                    className={`border rounded-lg p-4 transition-all ${
-                      ch.solved
-                        ? "border-green-500/50 bg-green-500/5"
-                        : "border-border bg-card"
-                    }`}
-                  >
-                    {/* Card Header */}
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-base">
-                        {ch.solved && (
-                          <span className="text-green-400 mr-1">&#10003;</span>
-                        )}
-                        {ch.title}
-                      </h3>
-                      <span className="text-lg font-bold text-primary ml-2 shrink-0">
-                        {ch.points} pts
-                      </span>
-                    </div>
-
-                    {/* Badges */}
-                    <div className="flex gap-2 mb-3 flex-wrap">
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          DIFFICULTY_COLORS[ch.difficulty] || ""
-                        }`}
-                      >
-                        {ch.difficulty}
-                      </span>
-                      {ch.category && (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-500/20 text-zinc-400">
-                          {ch.category}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {tierGroup.challenges.map((ch) => (
+                    <div
+                      key={ch.id}
+                      className={`border rounded-lg p-4 transition-all ${
+                        ch.solved
+                          ? "border-green-500/50 bg-green-500/5"
+                          : "border-border bg-card"
+                      }`}
+                    >
+                      {/* Card Header */}
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-base">
+                          {ch.solved && (
+                            <span className="text-green-400 mr-1">&#10003;</span>
+                          )}
+                          {ch.title}
+                        </h3>
+                        <span className="text-lg font-bold text-primary ml-2 shrink-0">
+                          {ch.points} pts
                         </span>
+                      </div>
+
+                      {/* Badges */}
+                      <div className="flex gap-2 mb-3 flex-wrap">
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            DIFFICULTY_COLORS[ch.difficulty] || ""
+                          }`}
+                        >
+                          {ch.difficulty}
+                        </span>
+                        {ch.category && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-500/20 text-zinc-400">
+                            {ch.category}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Description */}
+                      {ch.description && (
+                        <p className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
+                          {ch.description}
+                        </p>
+                      )}
+
+                      {/* Starter Download */}
+                      <button
+                        onClick={async () => {
+                          const token = getToken();
+                          if (!token) return;
+                          try {
+                            const res = await fetch(
+                              `/api/starter/${ch.sortOrder}?format=zip`,
+                              {
+                                headers: {
+                                  Authorization: `Bearer ${token}`,
+                                },
+                              }
+                            );
+                            if (!res.ok) return;
+                            const blob = await res.blob();
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `challenge-${ch.sortOrder}-starter.zip`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                          } catch {
+                            // silently fail
+                          }
+                        }}
+                        className="text-sm text-primary underline mb-3 block text-left cursor-pointer hover:opacity-80"
+                      >
+                        Download starter code
+                      </button>
+
+                      {/* Hints */}
+                      {ch.hints && ch.hints.length > 0 && (
+                        <div className="mb-3">
+                          <button
+                            onClick={() =>
+                              setShowHints((prev) => ({
+                                ...prev,
+                                [ch.id]: Math.min(
+                                  (prev[ch.id] || 0) + 1,
+                                  ch.hints!.length
+                                ),
+                              }))
+                            }
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {(showHints[ch.id] || 0) < ch.hints.length
+                              ? `Show hint (${showHints[ch.id] || 0}/${
+                                  ch.hints.length
+                                })`
+                              : `All hints shown`}
+                          </button>
+                          {(showHints[ch.id] || 0) > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {ch.hints
+                                .slice(0, showHints[ch.id])
+                                .map((hint, i) => (
+                                  <p
+                                    key={i}
+                                    className="text-xs bg-accent/50 p-2 rounded"
+                                  >
+                                    Hint {i + 1}: {hint}
+                                  </p>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Play button for prison escape challenge */}
+                      {ch.sortOrder === 20 && !ch.solved && (
+                        <a
+                          href="/prison"
+                          className="inline-block px-6 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-md text-sm font-bold transition-colors mb-2"
+                        >
+                          Play
+                        </a>
+                      )}
+
+                      {/* Flag Submission */}
+                      {!ch.solved && ch.sortOrder !== 20 && (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder={
+                              ch.validationType &&
+                              ch.validationType !== "flag"
+                                ? "Paste token (fallback only)..."
+                                : "FLAG{...}"
+                            }
+                            value={flagInputs[ch.id] || ""}
+                            onChange={(e) =>
+                              setFlagInputs((prev) => ({
+                                ...prev,
+                                [ch.id]: e.target.value,
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSubmit(ch.id);
+                            }}
+                            className="flex-1 px-3 py-1.5 bg-background border border-input rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                          />
+                          <button
+                            onClick={() => handleSubmit(ch.id)}
+                            disabled={submitting === ch.id}
+                            className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                          >
+                            {submitting === ch.id ? "..." : "Submit"}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Fallback token submission for prison escape */}
+                      {!ch.solved && ch.sortOrder === 20 && (
+                        <div className="mt-2">
+                          <details className="text-xs text-muted-foreground">
+                            <summary className="cursor-pointer hover:text-foreground">
+                              Have a token? Submit manually
+                            </summary>
+                            <div className="flex gap-2 mt-2">
+                              <input
+                                type="text"
+                                placeholder="CTF:..."
+                                value={flagInputs[ch.id] || ""}
+                                onChange={(e) =>
+                                  setFlagInputs((prev) => ({
+                                    ...prev,
+                                    [ch.id]: e.target.value,
+                                  }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSubmit(ch.id);
+                                }}
+                                className="flex-1 px-3 py-1.5 bg-background border border-input rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                              />
+                              <button
+                                onClick={() => handleSubmit(ch.id)}
+                                disabled={submitting === ch.id}
+                                className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                              >
+                                {submitting === ch.id ? "..." : "Submit"}
+                              </button>
+                            </div>
+                          </details>
+                        </div>
+                      )}
+
+                      {/* Result */}
+                      {results[ch.id] && (
+                        <p
+                          className={`text-sm mt-2 ${
+                            results[ch.id].correct
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {results[ch.id].message}
+                        </p>
                       )}
                     </div>
-
-                    {/* Description */}
-                    {ch.description && (
-                      <p className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
-                        {ch.description}
-                      </p>
-                    )}
-
-                    {/* Starter Download */}
-                    <button
-                      onClick={async () => {
-                        const token = getToken();
-                        if (!token) return;
-                        try {
-                          const res = await fetch(
-                            `/api/starter/${ch.sortOrder}?format=zip`,
-                            {
-                              headers: {
-                                Authorization: `Bearer ${token}`,
-                              },
-                            }
-                          );
-                          if (!res.ok) return;
-                          const blob = await res.blob();
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `challenge-${ch.sortOrder}-starter.zip`;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                          URL.revokeObjectURL(url);
-                        } catch {
-                          // silently fail
-                        }
-                      }}
-                      className="text-sm text-primary underline mb-3 block text-left cursor-pointer hover:opacity-80"
+                  ))}
+                </div>
+              ) : (
+                /* Locked Tier - Show preview cards */
+                <div className="grid gap-4 md:grid-cols-2 opacity-50">
+                  {tierGroup.challenges.map((ch) => (
+                    <div
+                      key={ch.id}
+                      className="border border-border/50 rounded-lg p-4 bg-card/50"
                     >
-                      Download starter code
-                    </button>
-
-                    {/* Hints */}
-                    {ch.hints && ch.hints.length > 0 && (
-                      <div className="mb-3">
-                        <button
-                          onClick={() =>
-                            setShowHints((prev) => ({
-                              ...prev,
-                              [ch.id]: Math.min(
-                                (prev[ch.id] || 0) + 1,
-                                ch.hints!.length
-                              ),
-                            }))
-                          }
-                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          {(showHints[ch.id] || 0) < ch.hints.length
-                            ? `Show hint (${showHints[ch.id] || 0}/${
-                                ch.hints.length
-                              })`
-                            : `All hints shown`}
-                        </button>
-                        {(showHints[ch.id] || 0) > 0 && (
-                          <div className="mt-2 space-y-1">
-                            {ch.hints
-                              .slice(0, showHints[ch.id])
-                              .map((hint, i) => (
-                                <p
-                                  key={i}
-                                  className="text-xs bg-accent/50 p-2 rounded"
-                                >
-                                  Hint {i + 1}: {hint}
-                                </p>
-                              ))}
-                          </div>
-                        )}
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-base text-muted-foreground">
+                          {ch.title}
+                        </h3>
+                        <span className="text-lg font-bold text-muted-foreground ml-2 shrink-0">
+                          {ch.points} pts
+                        </span>
                       </div>
-                    )}
-
-                    {/* Play button for prison escape challenge */}
-                    {ch.sortOrder === 20 && !ch.solved && (
-                      <a
-                        href="/prison"
-                        className="inline-block px-6 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-md text-sm font-bold transition-colors mb-2"
-                      >
-                        Play
-                      </a>
-                    )}
-
-                    {/* Flag Submission */}
-                    {!ch.solved && ch.sortOrder !== 20 && (
                       <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder={
-                            ch.validationType &&
-                            ch.validationType !== "flag"
-                              ? "Paste token (fallback only)..."
-                              : "FLAG{...}"
-                          }
-                          value={flagInputs[ch.id] || ""}
-                          onChange={(e) =>
-                            setFlagInputs((prev) => ({
-                              ...prev,
-                              [ch.id]: e.target.value,
-                            }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleSubmit(ch.id);
-                          }}
-                          className="flex-1 px-3 py-1.5 bg-background border border-input rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                        <button
-                          onClick={() => handleSubmit(ch.id)}
-                          disabled={submitting === ch.id}
-                          className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            DIFFICULTY_COLORS[ch.difficulty] || ""
+                          }`}
                         >
-                          {submitting === ch.id ? "..." : "Submit"}
-                        </button>
+                          {ch.difficulty}
+                        </span>
                       </div>
-                    )}
-
-                    {/* Fallback token submission for prison escape */}
-                    {!ch.solved && ch.sortOrder === 20 && (
-                      <div className="mt-2">
-                        <details className="text-xs text-muted-foreground">
-                          <summary className="cursor-pointer hover:text-foreground">
-                            Have a token? Submit manually
-                          </summary>
-                          <div className="flex gap-2 mt-2">
-                            <input
-                              type="text"
-                              placeholder="CTF:..."
-                              value={flagInputs[ch.id] || ""}
-                              onChange={(e) =>
-                                setFlagInputs((prev) => ({
-                                  ...prev,
-                                  [ch.id]: e.target.value,
-                                }))
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleSubmit(ch.id);
-                              }}
-                              className="flex-1 px-3 py-1.5 bg-background border border-input rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
-                            <button
-                              onClick={() => handleSubmit(ch.id)}
-                              disabled={submitting === ch.id}
-                              className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-                            >
-                              {submitting === ch.id ? "..." : "Submit"}
-                            </button>
-                          </div>
-                        </details>
-                      </div>
-                    )}
-
-                    {/* Result */}
-                    {results[ch.id] && (
-                      <p
-                        className={`text-sm mt-2 ${
-                          results[ch.id].correct
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {results[ch.id].message}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              /* Locked Tier - Show preview cards */
-              <div className="grid gap-4 md:grid-cols-2 opacity-50">
-                {tierGroup.challenges.map((ch) => (
-                  <div
-                    key={ch.id}
-                    className="border border-border/50 rounded-lg p-4 bg-card/50"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-base text-muted-foreground">
-                        {ch.title}
-                      </h3>
-                      <span className="text-lg font-bold text-muted-foreground ml-2 shrink-0">
-                        {ch.points} pts
-                      </span>
                     </div>
-                    <div className="flex gap-2">
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          DIFFICULTY_COLORS[ch.difficulty] || ""
-                        }`}
-                      >
-                        {ch.difficulty}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        ))}
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
       </main>
     </div>
   );

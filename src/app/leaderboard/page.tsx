@@ -2,11 +2,17 @@
 
 import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { TIER_BADGES } from "@/lib/tier-badges";
 
 type LeaderboardEntry = {
   name: string;
   totalPoints: number | null;
+  maxTier: number;
 };
+
+function getBadge(tier: number) {
+  return TIER_BADGES[Math.max(0, Math.min(tier - 1, TIER_BADGES.length - 1))];
+}
 
 export default function LeaderboardPage() {
   return (
@@ -214,6 +220,7 @@ function LeaderboardContent() {
             const points = entry.totalPoints ?? 0;
             const barWidth = maxPoints > 0 ? (points / maxPoints) * 100 : 0;
             const isChanged = changedIds.has(entry.name);
+            const badge = getBadge(entry.maxTier);
 
             return (
               <div
@@ -231,7 +238,7 @@ function LeaderboardContent() {
                 }`}
               >
                 {/* Rank */}
-                <div className="w-10 text-center shrink-0">
+                <div className="w-8 text-center shrink-0">
                   {rank === 1 && points > 0 ? (
                     <span className="text-2xl">&#127942;</span>
                   ) : rank === 2 && points > 0 ? (
@@ -245,10 +252,31 @@ function LeaderboardContent() {
                   )}
                 </div>
 
+                {/* Tier Badge Icon */}
+                <div className="shrink-0 relative group">
+                  <img
+                    src={badge.imageSm}
+                    alt={badge.name}
+                    width={40}
+                    height={40}
+                    className="rounded-md"
+                  />
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    <span className={badge.color}>{badge.name}</span>
+                    <span className="text-muted-foreground ml-1">Tier {entry.maxTier}</span>
+                  </div>
+                </div>
+
                 {/* Name + Bar */}
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm truncate">
-                    {entry.name}
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm truncate">
+                      {entry.name}
+                    </span>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${badge.bgColor} ${badge.color}`}>
+                      T{entry.maxTier}
+                    </span>
                   </div>
                   <div className="mt-1 h-2 bg-secondary rounded-full overflow-hidden">
                     <div

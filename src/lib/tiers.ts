@@ -11,9 +11,11 @@ type TierStatus = {
 const UNLOCK_RULES: Record<number, string> = {
   1: "Available immediately",
   2: "Complete all Tier 1 challenges",
-  3: "Complete 3 or more Tier 2 challenges",
+  3: "Complete 2 or more Tier 2 challenges",
   4: "Complete 2 or more Tier 3 challenges",
   5: "Complete 2 or more Tier 4 challenges",
+  6: "Complete 2 or more Tier 5 challenges",
+  7: "Complete all Tier 6 challenges",
 };
 
 export function getUnlockRule(tier: number): string {
@@ -49,8 +51,8 @@ export async function getParticipantTierStatus(
   const solvedIds = new Set(solved.map((s) => s.challengeId));
 
   // Count totals and solves by tier
-  const totalByTier: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
-  const solvesByTier: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+  const totalByTier: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 };
+  const solvesByTier: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0 };
 
   for (const ch of allChallenges) {
     const t = String(ch.tier);
@@ -68,8 +70,8 @@ export async function getParticipantTierStatus(
     maxTier = 2;
   }
 
-  // Tier 3 unlocks when 3+ Tier 2 challenges are solved
-  if (maxTier >= 2 && solvesByTier["2"] >= 3) {
+  // Tier 3 unlocks when 2+ Tier 2 challenges are solved
+  if (maxTier >= 2 && solvesByTier["2"] >= 2) {
     maxTier = 3;
   }
 
@@ -81,6 +83,16 @@ export async function getParticipantTierStatus(
   // Tier 5 unlocks when 2+ Tier 4 challenges are solved
   if (maxTier >= 4 && solvesByTier["4"] >= 2) {
     maxTier = 5;
+  }
+
+  // Tier 6 unlocks when 2+ Tier 5 challenges are solved
+  if (maxTier >= 5 && solvesByTier["5"] >= 2) {
+    maxTier = 6;
+  }
+
+  // Tier 7 unlocks when ALL Tier 6 challenges are solved
+  if (maxTier >= 6 && totalByTier["6"] > 0 && solvesByTier["6"] >= totalByTier["6"]) {
+    maxTier = 7;
   }
 
   return { maxTier, solvesByTier, totalByTier };

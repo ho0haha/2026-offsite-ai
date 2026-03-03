@@ -12,7 +12,8 @@ const tier1Validators: Record<number, (files: Map<string, string>) => Validation
   4: validateCh4,
   5: validateCh5,
   7: validateCh7,
-  9: validateCh9,
+  8: validateCh9,
+  9: validateCh7,
   11: validateCh11,
 };
 

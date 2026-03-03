@@ -1,23 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { challenges, submissions } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { verifyToken } from "@/lib/crypto";
 import { creditChallenge } from "@/lib/credit";
+import { requireAuth } from "@/lib/auth";
+import { getParticipantTierStatus, getNewlyUnlockedChallenges } from "@/lib/tiers";
 
 export async function POST(req: NextRequest) {
   try {
-    const { participantId, challengeId, flag } = await req.json();
+    const authResult = requireAuth(req);
+    if (authResult instanceof NextResponse) return authResult;
 
-    if (!participantId || !challengeId || !flag?.trim()) {
+    const { participantId, eventId } = authResult;
+    const { challengeId, flag } = await req.json();
+
+    if (!challengeId || !flag?.trim()) {
       return NextResponse.json(
-        { error: "participantId, challengeId, and flag are required" },
+        { error: "challengeId and flag are required" },
         { status: 400 }
       );
     }
 
     const trimmedFlag = flag.trim();
+
+    // Look up the challenge to check tier
+    const challenge = await db
+      .select()
+      .from(challenges)
+      .where(eq(challenges.id, challengeId))
+      .get();
+
+    if (!challenge) {
+      return NextResponse.json(
+        { error: "Challenge not found" },
+        { status: 404 }
+      );
+    }
+
+    // Verify the challenge tier is unlocked
+    const tierStatus = await getParticipantTierStatus(participantId, eventId);
+    if (challenge.tier > tierStatus.maxTier) {
+      return NextResponse.json(
+        { error: "This challenge is locked. Complete earlier tiers first." },
+        { status: 403 }
+      );
+    }
+
+    const previousMaxTier = tierStatus.maxTier;
 
     // Token verification path: if flag starts with "CTF:", treat as HMAC token
     if (trimmedFlag.startsWith("CTF:")) {
@@ -47,33 +78,22 @@ export async function POST(req: NextRequest) {
       if (result.alreadySolved) {
         return NextResponse.json({ correct: true, alreadySolved: true, message: result.message });
       }
+
+      const newlyUnlocked = await getNewlyUnlockedChallenges(participantId, eventId, previousMaxTier);
       return NextResponse.json({
         correct: true,
         alreadySolved: false,
         pointsAwarded: result.pointsAwarded,
         message: result.message,
+        newlyUnlocked,
       });
     }
 
     // Legacy flag comparison path
-    const challenge = await db
-      .select()
-      .from(challenges)
-      .where(eq(challenges.id, challengeId))
-      .get();
-
-    if (!challenge) {
-      return NextResponse.json(
-        { error: "Challenge not found" },
-        { status: 404 }
-      );
-    }
-
     const isCorrect =
       trimmedFlag.toLowerCase() === challenge.flag.toLowerCase();
 
     if (isCorrect) {
-      // Use shared credit logic (records submission, updates points)
       const result = await creditChallenge(participantId, challengeId, trimmedFlag);
       if (!result.success) {
         return NextResponse.json({ correct: false, alreadySolved: false, pointsAwarded: 0, message: result.message });
@@ -81,11 +101,14 @@ export async function POST(req: NextRequest) {
       if (result.alreadySolved) {
         return NextResponse.json({ correct: true, alreadySolved: true, message: result.message });
       }
+
+      const newlyUnlocked = await getNewlyUnlockedChallenges(participantId, eventId, previousMaxTier);
       return NextResponse.json({
         correct: true,
         alreadySolved: false,
         pointsAwarded: result.pointsAwarded,
         message: result.message,
+        newlyUnlocked,
       });
     }
 

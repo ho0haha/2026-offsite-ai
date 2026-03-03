@@ -18,7 +18,7 @@ type Challenge = {
   difficulty: string;
   points: number;
   flag: string;
-  tool: string;
+  tier: number;
   sortOrder: number;
 };
 
@@ -426,7 +426,7 @@ export default function AdminPage() {
                     <th className="py-2 px-2">Category</th>
                     <th className="py-2 px-2">Difficulty</th>
                     <th className="py-2 px-2">Points</th>
-                    <th className="py-2 px-2">Tool</th>
+                    <th className="py-2 px-2">Tier</th>
                     <th className="py-2 px-2">Flag</th>
                   </tr>
                 </thead>
@@ -454,7 +454,7 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="py-2 px-2 font-mono">{ch.points}</td>
-                      <td className="py-2 px-2">{ch.tool}</td>
+                      <td className="py-2 px-2">{ch.tier}</td>
                       <td className="py-2 px-2 font-mono text-xs text-muted-foreground max-w-[200px] truncate">
                         {ch.flag}
                       </td>

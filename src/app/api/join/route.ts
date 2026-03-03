@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { events, participants } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { generateSessionToken } from "@/lib/crypto";
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,9 +43,11 @@ export async function POST(req: NextRequest) {
       .get();
 
     if (existing) {
+      const token = generateSessionToken(existing.id, event.id);
       return NextResponse.json({
         participant: existing,
         event: { id: event.id, name: event.name },
+        token,
       });
     }
 
@@ -59,9 +62,11 @@ export async function POST(req: NextRequest) {
 
     await db.insert(participants).values(participant).run();
 
+    const token = generateSessionToken(participant.id, event.id);
     return NextResponse.json({
       participant,
       event: { id: event.id, name: event.name },
+      token,
     });
   } catch {
     return NextResponse.json(

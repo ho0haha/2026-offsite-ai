@@ -2,17 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { challenges, submissions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth";
+import { getParticipantTierStatus, getUnlockRule } from "@/lib/tiers";
 
 export async function GET(req: NextRequest) {
-  const eventId = req.nextUrl.searchParams.get("eventId");
-  const participantId = req.nextUrl.searchParams.get("participantId");
+  const authResult = requireAuth(req);
+  if (authResult instanceof NextResponse) return authResult;
 
-  if (!eventId) {
-    return NextResponse.json(
-      { error: "eventId is required" },
-      { status: 400 }
-    );
-  }
+  const { participantId, eventId } = authResult;
 
   const allChallenges = await db
     .select({
@@ -22,7 +19,7 @@ export async function GET(req: NextRequest) {
       category: challenges.category,
       difficulty: challenges.difficulty,
       points: challenges.points,
-      tool: challenges.tool,
+      tier: challenges.tier,
       hints: challenges.hints,
       sortOrder: challenges.sortOrder,
       starterUrl: challenges.starterUrl,
@@ -34,26 +31,82 @@ export async function GET(req: NextRequest) {
     .all();
 
   // Get solved challenges for this participant
-  let solvedSet = new Set<string>();
-  if (participantId) {
-    const solved = await db
-      .select({ challengeId: submissions.challengeId })
-      .from(submissions)
-      .where(
-        and(
-          eq(submissions.participantId, participantId),
-          eq(submissions.isCorrect, true)
-        )
+  const solved = await db
+    .select({ challengeId: submissions.challengeId })
+    .from(submissions)
+    .where(
+      and(
+        eq(submissions.participantId, participantId),
+        eq(submissions.isCorrect, true)
       )
-      .all();
-    solvedSet = new Set(solved.map((s) => s.challengeId!));
+    )
+    .all();
+  const solvedSet = new Set(solved.map((s) => s.challengeId!));
+
+  // Get tier status
+  const tierStatus = await getParticipantTierStatus(participantId, eventId);
+
+  // Group challenges by tier
+  const tierMap: Record<number, typeof allChallenges> = {};
+  for (const c of allChallenges) {
+    if (!tierMap[c.tier]) tierMap[c.tier] = [];
+    tierMap[c.tier].push(c);
   }
 
-  const result = allChallenges.map((c) => ({
-    ...c,
-    hints: c.hints ? JSON.parse(c.hints) : [],
-    solved: solvedSet.has(c.id),
-  }));
+  const tiers = Object.entries(tierMap)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([tierStr, tierChallenges]) => {
+      const tierNum = Number(tierStr);
+      const unlocked = tierNum <= tierStatus.maxTier;
 
-  return NextResponse.json(result);
+      return {
+        tier: tierNum,
+        unlocked,
+        unlockRule: getUnlockRule(tierNum),
+        challenges: tierChallenges.map((c) => {
+          if (unlocked) {
+            return {
+              id: c.id,
+              title: c.title,
+              description: c.description,
+              category: c.category,
+              difficulty: c.difficulty,
+              points: c.points,
+              tier: c.tier,
+              hints: c.hints ? JSON.parse(c.hints) : [],
+              sortOrder: c.sortOrder,
+              starterUrl: c.starterUrl,
+              validationType: c.validationType,
+              solved: solvedSet.has(c.id),
+            };
+          }
+          // Locked tier: return stub data only
+          return {
+            id: c.id,
+            title: c.title,
+            points: c.points,
+            difficulty: c.difficulty,
+            tier: c.tier,
+            sortOrder: c.sortOrder,
+            locked: true,
+          };
+        }),
+      };
+    });
+
+  // Compute total points from solved challenges
+  let totalPoints = 0;
+  for (const c of allChallenges) {
+    if (solvedSet.has(c.id)) totalPoints += c.points;
+  }
+
+  return NextResponse.json({
+    tiers,
+    progress: {
+      currentMaxTier: tierStatus.maxTier,
+      totalPoints,
+      solvesByTier: tierStatus.solvesByTier,
+      totalByTier: tierStatus.totalByTier,
+    },
+  });
 }

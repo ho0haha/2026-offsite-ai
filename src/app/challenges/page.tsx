@@ -6,16 +6,30 @@ import { useRouter } from "next/navigation";
 type Challenge = {
   id: string;
   title: string;
-  description: string;
-  category: string;
+  description?: string;
+  category?: string;
   difficulty: string;
   points: number;
-  tool: string;
-  hints: string[];
+  tier: number;
+  hints?: string[];
   sortOrder: number;
-  starterUrl: string | null;
-  solved: boolean;
-  validationType: string | null;
+  starterUrl?: string | null;
+  solved?: boolean;
+  validationType?: string | null;
+};
+
+type TierGroup = {
+  tier: number;
+  unlocked: boolean;
+  unlockRule: string;
+  challenges: Challenge[];
+};
+
+type Progress = {
+  currentMaxTier: number;
+  totalPoints: number;
+  solvesByTier: Record<string, number>;
+  totalByTier: Record<string, number>;
 };
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -24,58 +38,74 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   hard: "bg-red-500/20 text-red-400",
 };
 
-const TOOL_COLORS: Record<string, string> = {
-  Cursor: "bg-blue-500/20 text-blue-400",
-  "Claude Code": "bg-purple-500/20 text-purple-400",
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  "warm-up": "Warm-Up",
-  debugging: "Debugging & Diagnosis",
-  refactoring: "Refactoring & Code Quality",
-  "spec-to-feature": "Spec to Feature",
-  "building-with-llms": "Building with LLMs",
-  "advanced-mastery": "Advanced AI Tool Mastery",
-  bonus: "Bonus",
+const TIER_COLORS: Record<number, string> = {
+  1: "text-green-400",
+  2: "text-yellow-400",
+  3: "text-red-400",
 };
 
 export default function ChallengesPage() {
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [tiers, setTiers] = useState<TierGroup[]>([]);
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [flagInputs, setFlagInputs] = useState<Record<string, string>>({});
-  const [results, setResults] = useState<Record<string, { correct: boolean; message: string }>>({});
+  const [results, setResults] = useState<
+    Record<string, { correct: boolean; message: string }>
+  >({});
   const [showHints, setShowHints] = useState<Record<string, number>>({});
-  const [participant, setParticipant] = useState<{ id: string; name: string } | null>(null);
-  const [eventData, setEventData] = useState<{ id: string; name: string } | null>(null);
+  const [participant, setParticipant] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [unlockNotification, setUnlockNotification] = useState<
+    { tier: number; title: string; id: string }[] | null
+  >(null);
   const router = useRouter();
 
+  function getToken(): string | null {
+    return localStorage.getItem("ctf-token");
+  }
+
   const fetchChallenges = useCallback(async () => {
-    if (!eventData || !participant) return;
-    const res = await fetch(
-      `/api/challenges?eventId=${eventData.id}&participantId=${participant.id}`
-    );
-    if (res.ok) {
-      setChallenges(await res.json());
+    const token = getToken();
+    if (!token) {
+      router.push("/");
+      return;
     }
-  }, [eventData, participant]);
+    const res = await fetch("/api/challenges", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) {
+      localStorage.removeItem("ctf-token");
+      router.push("/");
+      return;
+    }
+    if (res.ok) {
+      const data = await res.json();
+      setTiers(data.tiers);
+      setProgress(data.progress);
+    }
+  }, [router]);
 
   useEffect(() => {
     const stored = localStorage.getItem("ctf-participant");
-    const storedEvent = localStorage.getItem("ctf-event");
-    if (!stored || !storedEvent) {
+    const storedToken = localStorage.getItem("ctf-token");
+    if (!stored || !storedToken) {
       router.push("/");
       return;
     }
     setParticipant(JSON.parse(stored));
-    setEventData(JSON.parse(storedEvent));
   }, [router]);
 
   useEffect(() => {
-    fetchChallenges();
-  }, [fetchChallenges]);
+    if (participant) {
+      fetchChallenges();
+    }
+  }, [participant, fetchChallenges]);
 
   async function handleSubmit(challengeId: string) {
-    if (!participant) return;
+    const token = getToken();
+    if (!token) return;
     const flag = flagInputs[challengeId];
     if (!flag?.trim()) return;
 
@@ -85,12 +115,11 @@ export default function ChallengesPage() {
     try {
       const res = await fetch("/api/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          participantId: participant.id,
-          challengeId,
-          flag,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ challengeId, flag }),
       });
 
       const data = await res.json();
@@ -100,7 +129,10 @@ export default function ChallengesPage() {
       }));
 
       if (data.correct) {
-        // Refresh challenges to update solved status
+        if (data.newlyUnlocked?.length > 0) {
+          setUnlockNotification(data.newlyUnlocked);
+          setTimeout(() => setUnlockNotification(null), 8000);
+        }
         fetchChallenges();
         setFlagInputs((prev) => ({ ...prev, [challengeId]: "" }));
       }
@@ -117,29 +149,6 @@ export default function ChallengesPage() {
     }
   }
 
-  // Group challenges by category
-  const grouped = challenges.reduce<Record<string, Challenge[]>>(
-    (acc, ch) => {
-      (acc[ch.category] ||= []).push(ch);
-      return acc;
-    },
-    {}
-  );
-
-  const categoryOrder = [
-    "warm-up",
-    "debugging",
-    "refactoring",
-    "spec-to-feature",
-    "building-with-llms",
-    "advanced-mastery",
-    "bonus",
-  ];
-
-  const totalPoints = challenges
-    .filter((c) => c.solved)
-    .reduce((sum, c) => sum + c.points, 0);
-
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -154,9 +163,38 @@ export default function ChallengesPage() {
             </p>
           </div>
           <div className="flex items-center gap-4">
+            {/* Tier Progress */}
+            {progress && (
+              <div className="flex items-center gap-3">
+                {[1, 2, 3].map((t) => {
+                  const solved = progress.solvesByTier[String(t)] || 0;
+                  const total = progress.totalByTier[String(t)] || 0;
+                  const unlocked = t <= progress.currentMaxTier;
+                  return (
+                    <div
+                      key={t}
+                      className={`text-center ${
+                        unlocked ? "" : "opacity-40"
+                      }`}
+                    >
+                      <div
+                        className={`text-xs font-medium ${
+                          TIER_COLORS[t] || ""
+                        }`}
+                      >
+                        T{t}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {solved}/{total}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="text-right">
               <div className="text-2xl font-bold text-primary">
-                {totalPoints}
+                {progress?.totalPoints ?? 0}
               </div>
               <div className="text-xs text-muted-foreground">points</div>
             </div>
@@ -170,19 +208,49 @@ export default function ChallengesPage() {
         </div>
       </header>
 
-      {/* Challenge Cards */}
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
-        {categoryOrder.map((cat) => {
-          const catChallenges = grouped[cat];
-          if (!catChallenges?.length) return null;
+      {/* Unlock Notification */}
+      {unlockNotification && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-green-500/20 border border-green-500/50 rounded-lg p-4 shadow-lg max-w-md animate-in fade-in slide-in-from-top-4">
+          <p className="text-green-400 font-semibold mb-2">
+            New challenges unlocked!
+          </p>
+          {unlockNotification.map((ch) => (
+            <p key={ch.id} className="text-sm text-green-300">
+              Tier {ch.tier}: {ch.title}
+            </p>
+          ))}
+        </div>
+      )}
 
-          return (
-            <section key={cat}>
-              <h2 className="text-lg font-semibold mb-3 text-muted-foreground">
-                {CATEGORY_LABELS[cat] || cat}
+      {/* Challenge Cards by Tier */}
+      <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
+        {tiers.map((tierGroup) => (
+          <section key={tierGroup.tier}>
+            <div className="flex items-center gap-3 mb-3">
+              <h2
+                className={`text-lg font-semibold ${
+                  TIER_COLORS[tierGroup.tier] || ""
+                }`}
+              >
+                Tier {tierGroup.tier}
               </h2>
+              {tierGroup.unlocked ? (
+                <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
+                  Unlocked
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded text-xs bg-zinc-500/20 text-zinc-400">
+                  Locked
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {tierGroup.unlockRule}
+              </span>
+            </div>
+
+            {tierGroup.unlocked ? (
               <div className="grid gap-4 md:grid-cols-2">
-                {catChallenges.map((ch) => (
+                {tierGroup.challenges.map((ch) => (
                   <div
                     key={ch.id}
                     className={`border rounded-lg p-4 transition-all ${
@@ -213,19 +281,19 @@ export default function ChallengesPage() {
                       >
                         {ch.difficulty}
                       </span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          TOOL_COLORS[ch.tool] || ""
-                        }`}
-                      >
-                        {ch.tool}
-                      </span>
+                      {ch.category && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-500/20 text-zinc-400">
+                          {ch.category}
+                        </span>
+                      )}
                     </div>
 
                     {/* Description */}
-                    <p className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
-                      {ch.description}
-                    </p>
+                    {ch.description && (
+                      <p className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
+                        {ch.description}
+                      </p>
+                    )}
 
                     {/* Starter URL */}
                     {ch.starterUrl && (
@@ -240,7 +308,7 @@ export default function ChallengesPage() {
                     )}
 
                     {/* Hints */}
-                    {ch.hints.length > 0 && (
+                    {ch.hints && ch.hints.length > 0 && (
                       <div className="mb-3">
                         <button
                           onClick={() =>
@@ -248,14 +316,16 @@ export default function ChallengesPage() {
                               ...prev,
                               [ch.id]: Math.min(
                                 (prev[ch.id] || 0) + 1,
-                                ch.hints.length
+                                ch.hints!.length
                               ),
                             }))
                           }
                           className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {(showHints[ch.id] || 0) < ch.hints.length
-                            ? `Show hint (${showHints[ch.id] || 0}/${ch.hints.length})`
+                            ? `Show hint (${showHints[ch.id] || 0}/${
+                                ch.hints.length
+                              })`
                             : `All hints shown`}
                         </button>
                         {(showHints[ch.id] || 0) > 0 && (
@@ -280,7 +350,12 @@ export default function ChallengesPage() {
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder={ch.validationType && ch.validationType !== "flag" ? "Paste token (fallback only)..." : "FLAG{...}"}
+                          placeholder={
+                            ch.validationType &&
+                            ch.validationType !== "flag"
+                              ? "Paste token (fallback only)..."
+                              : "FLAG{...}"
+                          }
                           value={flagInputs[ch.id] || ""}
                           onChange={(e) =>
                             setFlagInputs((prev) => ({
@@ -318,9 +393,37 @@ export default function ChallengesPage() {
                   </div>
                 ))}
               </div>
-            </section>
-          );
-        })}
+            ) : (
+              /* Locked Tier - Show preview cards */
+              <div className="grid gap-4 md:grid-cols-2 opacity-50">
+                {tierGroup.challenges.map((ch) => (
+                  <div
+                    key={ch.id}
+                    className="border border-border/50 rounded-lg p-4 bg-card/50"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold text-base text-muted-foreground">
+                        {ch.title}
+                      </h3>
+                      <span className="text-lg font-bold text-muted-foreground ml-2 shrink-0">
+                        {ch.points} pts
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          DIFFICULTY_COLORS[ch.difficulty] || ""
+                        }`}
+                      >
+                        {ch.difficulty}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ))}
       </main>
     </div>
   );

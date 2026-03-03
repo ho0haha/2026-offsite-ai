@@ -32,6 +32,9 @@ export default function JoinPage() {
       // Store session in localStorage
       localStorage.setItem("ctf-participant", JSON.stringify(data.participant));
       localStorage.setItem("ctf-event", JSON.stringify(data.event));
+      if (data.token) {
+        localStorage.setItem("ctf-token", data.token);
+      }
 
       router.push("/challenges");
     } catch {

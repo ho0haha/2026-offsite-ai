@@ -5,16 +5,22 @@ import { eq, and } from "drizzle-orm";
 import { validateChallenge } from "@/lib/validation";
 import { creditChallenge } from "@/lib/credit";
 import { generateToken } from "@/lib/crypto";
+import { requireAuth } from "@/lib/auth";
+import { getParticipantTierStatus, getNewlyUnlockedChallenges } from "@/lib/tiers";
 
 export async function POST(req: NextRequest) {
   try {
+    const authResult = requireAuth(req);
+    if (authResult instanceof NextResponse) return authResult;
+
+    const { participantId, eventId } = authResult;
+
     const formData = await req.formData();
-    const participantId = formData.get("participantId") as string | null;
     const challengeNumberStr = formData.get("challengeNumber") as string | null;
 
-    if (!participantId || !challengeNumberStr) {
+    if (!challengeNumberStr) {
       return NextResponse.json(
-        { valid: false, message: "participantId and challengeNumber are required" },
+        { valid: false, message: "challengeNumber is required" },
         { status: 400 }
       );
     }
@@ -59,6 +65,17 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Tier check: ensure the challenge tier is unlocked
+    const tierStatus = await getParticipantTierStatus(participantId, eventId);
+    if (challenge.tier > tierStatus.maxTier) {
+      return NextResponse.json(
+        { valid: false, message: "This challenge is locked. Complete earlier tiers first." },
+        { status: 403 }
+      );
+    }
+
+    const previousMaxTier = tierStatus.maxTier;
 
     const validationType = challenge.validationType || "flag";
     if (validationType === "flag") {
@@ -123,12 +140,16 @@ export async function POST(req: NextRequest) {
     // Generate fallback token in case the client needs it
     const token = generateToken(challenge.id, participantId);
 
+    // Check for newly unlocked tiers
+    const newlyUnlocked = await getNewlyUnlockedChallenges(participantId, eventId, previousMaxTier);
+
     return NextResponse.json({
       valid: true,
       alreadySolved: false,
       pointsAwarded: creditResult.pointsAwarded,
       message: creditResult.message,
       token,
+      newlyUnlocked,
     });
   } catch (err) {
     console.error("Validation error:", err);

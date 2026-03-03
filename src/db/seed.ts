@@ -405,7 +405,9 @@ async function main() {
         name TEXT NOT NULL,
         event_id TEXT REFERENCES events(id),
         joined_at TEXT DEFAULT (datetime('now')),
-        total_points INTEGER DEFAULT 0
+        total_points INTEGER DEFAULT 0,
+        secret_key TEXT,
+        modem_activated INTEGER DEFAULT 0
       )`,
       `CREATE TABLE IF NOT EXISTS challenges (
         id TEXT PRIMARY KEY,

@@ -26,9 +26,9 @@ export async function POST(req: NextRequest) {
     }
 
     const challengeNumber = parseInt(challengeNumberStr, 10);
-    if (isNaN(challengeNumber) || challengeNumber < 1 || challengeNumber > 12) {
+    if (isNaN(challengeNumber) || challengeNumber < 1 || challengeNumber > 17) {
       return NextResponse.json(
-        { valid: false, message: "challengeNumber must be between 1 and 12" },
+        { valid: false, message: "challengeNumber must be between 1 and 17" },
         { status: 400 }
       );
     }

@@ -1,0 +1,229 @@
+{
+  "1": {
+    "dir": "01-hello-ai",
+    "include": ["README.md", "requirements.txt", "starter.py", "ctf_helper.py"]
+  },
+  "2": {
+    "dir": "02-bug-squash",
+    "include": ["README.md", "buggy_script.py", "ctf_helper.py"]
+  },
+  "3": {
+    "dir": "03-broken-order-system",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "app/__init__.py",
+      "app/main.py",
+      "app/models.py",
+      "app/routes.py",
+      "app/utils.py",
+      "tests/__init__.py",
+      "tests/test_orders.py"
+    ]
+  },
+  "4": {
+    "dir": "04-production-incident",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "app/__init__.py",
+      "app/config.py",
+      "app/database.py",
+      "app/server.py",
+      "healthcheck.py",
+      "logs/error.log",
+      "recover.sh"
+    ]
+  },
+  "5": {
+    "dir": "05-spaghetti-untangler",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "order_processor.py",
+      "test_processor.py"
+    ]
+  },
+  "6": {
+    "dir": "06-test-factory",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "inventory.py",
+      "run_coverage.sh"
+    ]
+  },
+  "7": {
+    "dir": "11-prompt-craftsman",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "challenges/challenge1/function.py",
+      "challenges/challenge1/task.md",
+      "challenges/challenge2/functions.py",
+      "challenges/challenge2/task.md",
+      "challenges/challenge3/slow_function.py",
+      "challenges/challenge3/task.md",
+      "challenges/challenge4/algorithm.py",
+      "challenges/challenge4/task.md",
+      "challenges/challenge5/new_schema.py",
+      "challenges/challenge5/old_schema.py",
+      "challenges/challenge5/task.md",
+      "outputs/.gitkeep"
+    ]
+  },
+  "8": {
+    "dir": "09-smart-feedback-sorter",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "feedback.csv"
+    ]
+  },
+  "9": {
+    "dir": "07-spec-builder",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "brief.md"
+    ]
+  },
+  "10": {
+    "dir": "08-ai-menu-assistant",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "menu.json"
+    ]
+  },
+  "11": {
+    "dir": "10-context-is-king",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "FEATURE_SPEC.md",
+      "restaurant_system/__init__.py",
+      "restaurant_system/config.py",
+      "restaurant_system/customer_service.py",
+      "restaurant_system/database.py",
+      "restaurant_system/formatters.py",
+      "restaurant_system/menu_service.py",
+      "restaurant_system/models.py",
+      "restaurant_system/order_service.py",
+      "restaurant_system/payment_service.py",
+      "restaurant_system/reporting.py",
+      "restaurant_system/utils.py",
+      "restaurant_system/validators.py"
+    ]
+  },
+  "12": {
+    "dir": "12-full-stack-sprint",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "app/__init__.py",
+      "data/stores.csv"
+    ]
+  },
+  "13": {
+    "dir": "13-onion-bug",
+    "include": [
+      "README.md",
+      "order_system/__init__.py",
+      "order_system/inventory.py",
+      "order_system/models.py",
+      "order_system/pricing.py",
+      "order_system/processor.py",
+      "order_system/validators.py",
+      "run_tests.py",
+      "test_onion.py"
+    ]
+  },
+  "14": {
+    "dir": "14-fuzz-gauntlet",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "functions.py",
+      "models.py",
+      "run_fuzz.py",
+      "test_fuzz.py"
+    ]
+  },
+  "15": {
+    "dir": "15-undocumented-api",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "explorer.py",
+      "server.py"
+    ]
+  },
+  "16": {
+    "dir": "16-agent-maze",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "agent_template.py",
+      "maze_server.py"
+    ]
+  },
+  "17": {
+    "dir": "17-gauntlet-sprint",
+    "include": [
+      "README.md",
+      "run_gauntlet.py",
+      "gauntlet/01_async/README.md",
+      "gauntlet/01_async/broken_async.py",
+      "gauntlet/01_async/test_async.py",
+      "gauntlet/02_sql/README.md",
+      "gauntlet/02_sql/gauntlet_02.db",
+      "gauntlet/02_sql/setup_db.py",
+      "gauntlet/02_sql/slow_query.sql",
+      "gauntlet/02_sql/solution.py",
+      "gauntlet/02_sql/test_sql.py",
+      "gauntlet/03_regex/README.md",
+      "gauntlet/03_regex/solution.py",
+      "gauntlet/03_regex/test_regex.py",
+      "gauntlet/04_sort/README.md",
+      "gauntlet/04_sort/data.json",
+      "gauntlet/04_sort/generate_data.py",
+      "gauntlet/04_sort/solution.py",
+      "gauntlet/04_sort/test_sort.py",
+      "gauntlet/05_ratelimit/README.md",
+      "gauntlet/05_ratelimit/solution.py",
+      "gauntlet/05_ratelimit/test_ratelimit.py",
+      "gauntlet/06_logparse/README.md",
+      "gauntlet/06_logparse/pos_logs.txt",
+      "gauntlet/06_logparse/solution.py",
+      "gauntlet/06_logparse/test_logparse.py",
+      "gauntlet/07_memleak/README.md",
+      "gauntlet/07_memleak/leaky_server.py",
+      "gauntlet/07_memleak/test_memleak.py",
+      "gauntlet/08_cache/README.md",
+      "gauntlet/08_cache/solution.py",
+      "gauntlet/08_cache/test_cache.py",
+      "gauntlet/09_migration/README.md",
+      "gauntlet/09_migration/gauntlet_09.db",
+      "gauntlet/09_migration/new_schema.sql",
+      "gauntlet/09_migration/old_schema.sql",
+      "gauntlet/09_migration/setup_db.py",
+      "gauntlet/09_migration/solution.py",
+      "gauntlet/09_migration/test_migration.py",
+      "gauntlet/10_stream/README.md",
+      "gauntlet/10_stream/generate_data.py",
+      "gauntlet/10_stream/solution.py",
+      "gauntlet/10_stream/test_stream.py"
+    ]
+  }
+}

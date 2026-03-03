@@ -42,6 +42,8 @@ const TIER_COLORS: Record<number, string> = {
   1: "text-green-400",
   2: "text-yellow-400",
   3: "text-red-400",
+  4: "text-purple-400",
+  5: "text-pink-400",
 };
 
 export default function ChallengesPage() {
@@ -166,7 +168,7 @@ export default function ChallengesPage() {
             {/* Tier Progress */}
             {progress && (
               <div className="flex items-center gap-3">
-                {[1, 2, 3].map((t) => {
+                {[1, 2, 3, 4, 5].map((t) => {
                   const solved = progress.solvesByTier[String(t)] || 0;
                   const total = progress.totalByTier[String(t)] || 0;
                   const unlocked = t <= progress.currentMaxTier;
@@ -295,17 +297,38 @@ export default function ChallengesPage() {
                       </p>
                     )}
 
-                    {/* Starter URL */}
-                    {ch.starterUrl && (
-                      <a
-                        href={ch.starterUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary underline mb-3 block"
-                      >
-                        Download starter code
-                      </a>
-                    )}
+                    {/* Starter Download */}
+                    <button
+                      onClick={async () => {
+                        const token = getToken();
+                        if (!token) return;
+                        try {
+                          const res = await fetch(
+                            `/api/starter/${ch.sortOrder}?format=zip`,
+                            {
+                              headers: {
+                                Authorization: `Bearer ${token}`,
+                              },
+                            }
+                          );
+                          if (!res.ok) return;
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `challenge-${ch.sortOrder}-starter.zip`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          // silently fail
+                        }
+                      }}
+                      className="text-sm text-primary underline mb-3 block text-left cursor-pointer hover:opacity-80"
+                    >
+                      Download starter code
+                    </button>
 
                     {/* Hints */}
                     {ch.hints && ch.hints.length > 0 && (

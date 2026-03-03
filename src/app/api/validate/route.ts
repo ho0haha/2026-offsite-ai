@@ -7,6 +7,7 @@ import { creditChallenge } from "@/lib/credit";
 import { generateToken } from "@/lib/crypto";
 import { requireAuth } from "@/lib/auth";
 import { getParticipantTierStatus, getNewlyUnlockedChallenges } from "@/lib/tiers";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +15,15 @@ export async function POST(req: NextRequest) {
     if (authResult instanceof NextResponse) return authResult;
 
     const { participantId, eventId } = authResult;
+
+    // Rate limit: 10 validations per minute per participant
+    const rl = checkRateLimit(`validate:${participantId}`, 10, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { valid: false, message: "Too many attempts. Try again shortly." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
 
     const formData = await req.formData();
     const challengeNumberStr = formData.get("challengeNumber") as string | null;

@@ -4,7 +4,6 @@ import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 
 type LeaderboardEntry = {
-  id: string;
   name: string;
   totalPoints: number | null;
 };
@@ -50,22 +49,22 @@ function LeaderboardContent() {
       const newRanks = new Map<string, number>();
       const newPoints = new Map<string, number>();
       data.leaderboard.forEach((entry: LeaderboardEntry, idx: number) => {
-        newRanks.set(entry.id, idx);
-        newPoints.set(entry.id, entry.totalPoints ?? 0);
+        newRanks.set(entry.name, idx);
+        newPoints.set(entry.name, entry.totalPoints ?? 0);
       });
 
       const changed = new Set<string>();
-      newRanks.forEach((newRank, id) => {
-        const oldRank = prevRanksRef.current.get(id);
+      newRanks.forEach((newRank, name) => {
+        const oldRank = prevRanksRef.current.get(name);
         if (oldRank !== undefined && oldRank !== newRank) {
-          changed.add(id);
+          changed.add(name);
         }
       });
 
       // Detect point increases for confetti
       let pointsIncreased = false;
-      newPoints.forEach((pts, id) => {
-        const oldPts = prevPointsRef.current.get(id);
+      newPoints.forEach((pts, name) => {
+        const oldPts = prevPointsRef.current.get(name);
         if (oldPts !== undefined && pts > oldPts) {
           pointsIncreased = true;
         }
@@ -214,11 +213,11 @@ function LeaderboardContent() {
             const rank = idx + 1;
             const points = entry.totalPoints ?? 0;
             const barWidth = maxPoints > 0 ? (points / maxPoints) * 100 : 0;
-            const isChanged = changedIds.has(entry.id);
+            const isChanged = changedIds.has(entry.name);
 
             return (
               <div
-                key={entry.id}
+                key={entry.name}
                 className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
                   isChanged ? "animate-rank-up" : ""
                 } ${

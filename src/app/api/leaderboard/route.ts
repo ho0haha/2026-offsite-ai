@@ -20,7 +20,6 @@ export async function GET(req: NextRequest) {
 
   const leaderboard = (await db
     .select({
-      id: participants.id,
       name: participants.name,
       totalPoints: participants.totalPoints,
     })

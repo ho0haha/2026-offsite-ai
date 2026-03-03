@@ -7,6 +7,7 @@ import { verifyToken } from "@/lib/crypto";
 import { creditChallenge } from "@/lib/credit";
 import { requireAuth } from "@/lib/auth";
 import { getParticipantTierStatus, getNewlyUnlockedChallenges } from "@/lib/tiers";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,9 +15,19 @@ export async function POST(req: NextRequest) {
     if (authResult instanceof NextResponse) return authResult;
 
     const { participantId, eventId } = authResult;
+
+    // Rate limit: 10 submissions per minute per participant
+    const rl = checkRateLimit(`submit:${participantId}`, 10, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many submissions. Try again shortly." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+      );
+    }
+
     const { challengeId, flag } = await req.json();
 
-    if (!challengeId || !flag?.trim()) {
+    if (!challengeId || typeof flag !== "string" || !flag.trim()) {
       return NextResponse.json(
         { error: "challengeId and flag are required" },
         { status: 400 }

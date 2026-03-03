@@ -1,0 +1,1 @@
+ALTER TABLE `participants` ADD `secret_key` text;

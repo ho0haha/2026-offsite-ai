@@ -348,6 +348,26 @@ const challenges = [
     validationType: "upload",
     requiredFiles: ["run_gauntlet.py"],
   },
+  {
+    title: "A Prison of My Own Design",
+    description:
+      "You wake in a prison cell. 200 turns. One way out. No second chances.\n\nThis is a text-based escape room played through a terminal interface. Navigate 15 rooms, solve 7 chained puzzles, earn the trust of NPCs, and find the exit before lights-out.\n\nRules:\n- Type commands to interact (LOOK, EXAMINE, TALK TO, USE, COMBINE, etc.)\n- Some actions have permanent consequences. Think before you act.\n- Be polite to people. Or don't. Choices matter.\n- 200 turns. That's all you get.\n\nClick 'Play' to begin.",
+    category: "escape-room",
+    difficulty: "legendary",
+    points: 1000,
+    flag: "__DYNAMIC__",
+    hints: [
+      "Start by examining your cell carefully. The walls have stories to tell.",
+      "Be polite to everyone you meet. First impressions are permanent.",
+      "The Padre always tells the truth. Others... not so much.",
+      "Chapter and verse. The cross knows the way.",
+    ],
+    sortOrder: 20,
+    tier: 5,
+    starterUrl: null,
+    validationType: "server",
+    requiredFiles: null as unknown as string[],
+  },
 ];
 
 async function main() {
@@ -359,6 +379,8 @@ async function main() {
   // Drop and recreate tables (handles schema migration from tool -> tier)
   await client.batch(
     [
+      `DROP TABLE IF EXISTS game_commands`,
+      `DROP TABLE IF EXISTS game_sessions`,
       `DROP TABLE IF EXISTS submissions`,
       `DROP TABLE IF EXISTS challenges`,
       `DROP TABLE IF EXISTS participants`,
@@ -408,6 +430,27 @@ async function main() {
         is_correct INTEGER NOT NULL,
         points_awarded INTEGER DEFAULT 0,
         submitted_at TEXT DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS game_sessions (
+        id TEXT PRIMARY KEY,
+        participant_id TEXT NOT NULL REFERENCES participants(id),
+        event_id TEXT NOT NULL REFERENCES events(id),
+        state TEXT NOT NULL,
+        turn_count INTEGER DEFAULT 0,
+        started_at TEXT DEFAULT (datetime('now')),
+        last_command_at TEXT,
+        is_complete INTEGER DEFAULT 0,
+        escaped INTEGER DEFAULT 0,
+        abandoned_at TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS game_commands (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES game_sessions(id),
+        turn_number INTEGER NOT NULL,
+        command TEXT NOT NULL,
+        response TEXT NOT NULL,
+        room_id TEXT NOT NULL,
+        timestamp TEXT DEFAULT (datetime('now'))
       )`,
     ],
     "write"

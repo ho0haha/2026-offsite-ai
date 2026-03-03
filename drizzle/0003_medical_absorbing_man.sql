@@ -1,0 +1,1 @@
+ALTER TABLE `participants` ADD `modem_activated` integer DEFAULT false;

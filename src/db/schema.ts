@@ -15,6 +15,8 @@ export const participants = sqliteTable("participants", {
   eventId: text("event_id").references(() => events.id),
   joinedAt: text("joined_at").$defaultFn(() => new Date().toISOString()),
   totalPoints: integer("total_points").default(0),
+  secretKey: text("secret_key"),
+  modemActivated: integer("modem_activated", { mode: "boolean" }).default(false),
 });
 
 export const challenges = sqliteTable("challenges", {
@@ -42,4 +44,33 @@ export const submissions = sqliteTable("submissions", {
   isCorrect: integer("is_correct", { mode: "boolean" }).notNull(),
   pointsAwarded: integer("points_awarded").default(0),
   submittedAt: text("submitted_at").$defaultFn(() => new Date().toISOString()),
+});
+
+export const gameSessions = sqliteTable("game_sessions", {
+  id: text("id").primaryKey(),
+  participantId: text("participant_id")
+    .references(() => participants.id)
+    .notNull(),
+  eventId: text("event_id")
+    .references(() => events.id)
+    .notNull(),
+  state: text("state").notNull(), // JSON blob of GameState
+  turnCount: integer("turn_count").default(0),
+  startedAt: text("started_at").$defaultFn(() => new Date().toISOString()),
+  lastCommandAt: text("last_command_at"),
+  isComplete: integer("is_complete", { mode: "boolean" }).default(false),
+  escaped: integer("escaped", { mode: "boolean" }).default(false),
+  abandonedAt: text("abandoned_at"),
+});
+
+export const gameCommands = sqliteTable("game_commands", {
+  id: text("id").primaryKey(),
+  sessionId: text("session_id")
+    .references(() => gameSessions.id)
+    .notNull(),
+  turnNumber: integer("turn_number").notNull(),
+  command: text("command").notNull(),
+  response: text("response").notNull(), // truncated to 500 chars
+  roomId: text("room_id").notNull(),
+  timestamp: text("timestamp").$defaultFn(() => new Date().toISOString()),
 });

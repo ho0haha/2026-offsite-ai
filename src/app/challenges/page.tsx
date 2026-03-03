@@ -36,6 +36,7 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   easy: "bg-green-500/20 text-green-400",
   medium: "bg-yellow-500/20 text-yellow-400",
   hard: "bg-red-500/20 text-red-400",
+  legendary: "bg-pink-500/20 text-pink-400",
 };
 
 const TIER_COLORS: Record<number, string> = {
@@ -368,8 +369,18 @@ export default function ChallengesPage() {
                       </div>
                     )}
 
+                    {/* Play button for prison escape challenge */}
+                    {ch.sortOrder === 20 && !ch.solved && (
+                      <a
+                        href="/prison"
+                        className="inline-block px-6 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-md text-sm font-bold transition-colors mb-2"
+                      >
+                        Play
+                      </a>
+                    )}
+
                     {/* Flag Submission */}
-                    {!ch.solved && (
+                    {!ch.solved && ch.sortOrder !== 20 && (
                       <div className="flex gap-2">
                         <input
                           type="text"
@@ -398,6 +409,41 @@ export default function ChallengesPage() {
                         >
                           {submitting === ch.id ? "..." : "Submit"}
                         </button>
+                      </div>
+                    )}
+
+                    {/* Fallback token submission for prison escape */}
+                    {!ch.solved && ch.sortOrder === 20 && (
+                      <div className="mt-2">
+                        <details className="text-xs text-muted-foreground">
+                          <summary className="cursor-pointer hover:text-foreground">
+                            Have a token? Submit manually
+                          </summary>
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              type="text"
+                              placeholder="CTF:..."
+                              value={flagInputs[ch.id] || ""}
+                              onChange={(e) =>
+                                setFlagInputs((prev) => ({
+                                  ...prev,
+                                  [ch.id]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSubmit(ch.id);
+                              }}
+                              className="flex-1 px-3 py-1.5 bg-background border border-input rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                            <button
+                              onClick={() => handleSubmit(ch.id)}
+                              disabled={submitting === ch.id}
+                              className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                            >
+                              {submitting === ch.id ? "..." : "Submit"}
+                            </button>
+                          </div>
+                        </details>
                       </div>
                     )}
 

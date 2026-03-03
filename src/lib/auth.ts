@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken } from "@/lib/crypto";
+import { db } from "@/db";
+import { participants } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * Require a valid session token from the Authorization header.
@@ -26,4 +29,24 @@ export function requireAuth(
   }
 
   return session;
+}
+
+/**
+ * Returns a 404 if the participant has not activated the modem.
+ * This makes prison routes invisible to AI probing.
+ */
+export async function requireModem(
+  participantId: string
+): Promise<NextResponse | null> {
+  const participant = await db
+    .select({ modemActivated: participants.modemActivated })
+    .from(participants)
+    .where(eq(participants.id, participantId))
+    .get();
+
+  if (!participant?.modemActivated) {
+    return NextResponse.json({}, { status: 404 });
+  }
+
+  return null;
 }

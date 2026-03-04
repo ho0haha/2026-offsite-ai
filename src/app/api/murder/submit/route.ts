@@ -146,7 +146,6 @@ export async function POST(req: NextRequest) {
     message:
       "Case closed. You've identified the killer, the method, and the motive.",
     flag: flagToken,
-    solution: result.message, // CTF{R4J_P01S0N_ST0L3N_1P}
     stats: {
       totalMessages,
       maxPossible,

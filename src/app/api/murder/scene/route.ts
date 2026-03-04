@@ -9,6 +9,7 @@ import {
   type SceneArea,
 } from "@/lib/murder/constants";
 import { SCENE_DESCRIPTIONS } from "@/lib/murder/characters";
+import { getParticipantTierStatus } from "@/lib/tiers";
 
 /**
  * GET /api/murder/scene
@@ -18,6 +19,13 @@ export async function GET(req: NextRequest) {
   // Auth gate
   const authResult = requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
+  const { participantId, eventId } = authResult;
+
+  // Require tier 5 to view crime scene
+  const tierStatus = await getParticipantTierStatus(participantId, eventId);
+  if (tierStatus.maxTier < 5) {
+    return NextResponse.json({}, { status: 404 });
+  }
 
   return NextResponse.json({
     overview:

@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { db } from "@/db";
-import { participants } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth";
+import { getParticipantTierStatus } from "@/lib/tiers";
 
 // In-memory rate limiter per participant
 const rateLimitMap = new Map<string, number>();
 const RATE_LIMIT_MS = 2000;
 const MAX_TOKENS_CAP = 1024;
 const MODEL = "claude-haiku-4-5-20251001";
+
+// The LLM proxy is only available for challenges that need it (tier 3+)
+const REQUIRED_TIER = 3;
 
 let _client: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -23,8 +25,21 @@ function getClient(): Anthropic {
 }
 
 export async function POST(req: NextRequest) {
+  // Require valid session token
+  const auth = requireAuth(req);
+  if (auth instanceof NextResponse) return auth;
+  const { participantId, eventId } = auth;
+
+  // Require tier 3+ (challenges 8 & 9 use the LLM proxy)
+  const tierStatus = await getParticipantTierStatus(participantId, eventId);
+  if (tierStatus.maxTier < REQUIRED_TIER) {
+    return NextResponse.json(
+      { error: "LLM proxy is locked. Complete earlier tiers first." },
+      { status: 403 }
+    );
+  }
+
   let body: {
-    participantId: string;
     messages: { role: string; content: string }[];
     system?: string;
     max_tokens?: number;
@@ -36,11 +51,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { participantId, messages, system, max_tokens } = body;
+  const { messages, system, max_tokens } = body;
 
-  if (!participantId || !messages?.length) {
+  if (!messages?.length) {
     return NextResponse.json(
-      { error: "participantId and messages are required" },
+      { error: "messages are required" },
       { status: 400 }
     );
   }
@@ -49,20 +64,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "Maximum 20 messages per request" },
       { status: 400 }
-    );
-  }
-
-  // Validate participant exists
-  const participant = await db
-    .select({ id: participants.id })
-    .from(participants)
-    .where(eq(participants.id, participantId))
-    .get();
-
-  if (!participant) {
-    return NextResponse.json(
-      { error: "Invalid participant" },
-      { status: 403 }
     );
   }
 
@@ -87,19 +88,19 @@ export async function POST(req: NextRequest) {
       model: MODEL,
       max_tokens: cappedTokens,
       system: system || undefined,
-      messages: messages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
+      messages: messages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
     });
 
     const content =
       result.content[0].type === "text" ? result.content[0].text : "";
 
     return NextResponse.json({ content });
-  } catch (error) {
-    const msg =
-      error instanceof Error ? error.message.slice(0, 100) : "Unknown error";
-    return NextResponse.json({ error: `LLM error: ${msg}` }, { status: 502 });
+  } catch {
+    return NextResponse.json({ error: "LLM request failed" }, { status: 502 });
   }
 }

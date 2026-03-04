@@ -8,6 +8,8 @@ type LeaderboardEntry = {
   name: string;
   totalPoints: number | null;
   maxTier: number;
+  nukedAt?: string | null;
+  nukedBy?: string | null;
 };
 
 function getBadge(tier: number) {
@@ -38,6 +40,8 @@ function LeaderboardContent() {
   const prevRanksRef = useRef<Map<string, number>>(new Map());
   const prevPointsRef = useRef<Map<string, number>>(new Map());
   const [changedIds, setChangedIds] = useState<Set<string>>(new Set());
+  const [nukeFizzle, setNukeFizzle] = useState<{ active: boolean; by: string; oldScore: number } | null>(null);
+  const nukeDetectedRef = useRef<string | null>(null);
   const searchParams = useSearchParams();
 
   const fetchLeaderboard = useCallback(async (eventId: string) => {
@@ -87,6 +91,30 @@ function LeaderboardContent() {
       if (pointsIncreased) {
         setConfetti(true);
         setTimeout(() => setConfetti(false), 3000);
+      }
+
+      // Detect nuke on current user
+      const participantStr = typeof window !== "undefined" ? localStorage.getItem("ctf-participant") : null;
+      if (participantStr) {
+        try {
+          const participant = JSON.parse(participantStr);
+          const myEntry = data.leaderboard.find(
+            (e: LeaderboardEntry) => e.name === participant.name
+          );
+          if (myEntry?.nukedAt && myEntry.nukedBy) {
+            const nukeTime = new Date(myEntry.nukedAt).getTime();
+            const now = Date.now();
+            // Trigger fizzle if nuked within last 30 seconds and not already detected
+            if (now - nukeTime < 30000 && nukeDetectedRef.current !== myEntry.nukedAt) {
+              nukeDetectedRef.current = myEntry.nukedAt;
+              const oldPts = prevPointsRef.current.get(myEntry.name) ?? myEntry.totalPoints ?? 0;
+              setNukeFizzle({ active: true, by: myEntry.nukedBy, oldScore: oldPts });
+              setTimeout(() => setNukeFizzle(null), 5000);
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
       }
 
       setLeaderboard(data.leaderboard);
@@ -272,6 +300,85 @@ function LeaderboardContent() {
             @keyframes confetti-flash {
               0% { opacity: 0.6; }
               100% { opacity: 0; }
+            }
+          `}</style>
+        </div>
+      )}
+
+      {/* Nuke fizzle effect */}
+      {nukeFizzle?.active && (
+        <div className="fixed inset-0 z-[60] pointer-events-none overflow-hidden">
+          {/* CRT static/noise overlay */}
+          <div
+            className="absolute inset-0"
+            style={{
+              animation: "nuke-fizzle 4s ease-out forwards",
+              background: "black",
+            }}
+          />
+          {/* Static noise */}
+          <div
+            className="absolute inset-0 opacity-60"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.5'/%3E%3C/svg%3E")`,
+              backgroundSize: "128px 128px",
+              animation: "nuke-static 0.1s steps(5) infinite",
+            }}
+          />
+          {/* Red flash */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: "radial-gradient(circle, rgba(255,0,0,0.4) 0%, rgba(255,0,0,0.1) 50%, transparent 80%)",
+              animation: "nuke-flash 0.5s ease-out forwards",
+            }}
+          />
+          {/* DESTROYED text */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div
+              className="text-4xl sm:text-6xl font-mono-brand font-bold text-red-500 tracking-widest"
+              style={{
+                animation: "nuke-text-appear 0.8s ease-out 0.5s both",
+                textShadow: "0 0 20px rgba(255,0,0,0.8), 0 0 60px rgba(255,0,0,0.4)",
+              }}
+            >
+              DESTROYED
+            </div>
+            <div
+              className="text-lg sm:text-2xl font-mono-brand text-red-400 mt-4"
+              style={{
+                animation: "nuke-text-appear 0.8s ease-out 1s both",
+              }}
+            >
+              BY {nukeFizzle.by.toUpperCase()}
+            </div>
+            <NukeScoreCounter from={nukeFizzle.oldScore} />
+          </div>
+          <style>{`
+            @keyframes nuke-fizzle {
+              0% { opacity: 1; filter: brightness(5) contrast(3); }
+              10% { opacity: 1; filter: brightness(0.1) contrast(0.5) hue-rotate(90deg); }
+              20% { opacity: 1; filter: brightness(3) contrast(2) saturate(0); }
+              30% { opacity: 1; filter: brightness(0.2) contrast(5); }
+              50% { opacity: 1; filter: brightness(2) contrast(1) hue-rotate(180deg); }
+              70% { opacity: 0.9; filter: brightness(1) contrast(1); }
+              100% { opacity: 0; filter: brightness(1) contrast(1); }
+            }
+            @keyframes nuke-static {
+              0% { transform: translate(0, 0); }
+              20% { transform: translate(-5%, 5%); }
+              40% { transform: translate(5%, -5%); }
+              60% { transform: translate(-3%, -3%); }
+              80% { transform: translate(3%, 3%); }
+              100% { transform: translate(0, 0); }
+            }
+            @keyframes nuke-flash {
+              0% { opacity: 1; }
+              100% { opacity: 0; }
+            }
+            @keyframes nuke-text-appear {
+              0% { opacity: 0; transform: scale(2); }
+              100% { opacity: 1; transform: scale(1); }
             }
           `}</style>
         </div>
@@ -601,6 +708,42 @@ function LeaderboardContent() {
           `}</style>
         </div>
       </footer>
+    </div>
+  );
+}
+
+/** Animated score counter that decrements to 0 during nuke fizzle */
+function NukeScoreCounter({ from }: { from: number }) {
+  const [displayScore, setDisplayScore] = useState(from);
+
+  useEffect(() => {
+    if (from <= 0) return;
+    const steps = 30;
+    const interval = 50;
+    let step = 0;
+    const timer = setInterval(() => {
+      step++;
+      const progress = step / steps;
+      const eased = progress * progress; // ease-in
+      setDisplayScore(Math.max(0, Math.floor(from * (1 - eased))));
+      if (step >= steps) {
+        clearInterval(timer);
+        setDisplayScore(0);
+      }
+    }, interval);
+    return () => clearInterval(timer);
+  }, [from]);
+
+  return (
+    <div
+      className="text-5xl sm:text-7xl font-mono-brand font-bold text-red-500 mt-6"
+      style={{
+        animation: "nuke-text-appear 0.8s ease-out 1.2s both",
+        textShadow: "0 0 15px rgba(255,0,0,0.6)",
+      }}
+    >
+      {displayScore}
+      <span className="text-lg text-red-400 ml-2">pts</span>
     </div>
   );
 }

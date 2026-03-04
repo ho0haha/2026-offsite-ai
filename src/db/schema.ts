@@ -17,6 +17,9 @@ export const participants = sqliteTable("participants", {
   totalPoints: integer("total_points").default(0),
   secretKey: text("secret_key"),
   modemActivated: integer("modem_activated", { mode: "boolean" }).default(false),
+  nukedAt: text("nuked_at"),
+  nukedBy: text("nuked_by"),
+  nukesLaunched: integer("nukes_launched").default(0),
 });
 
 export const challenges = sqliteTable("challenges", {
@@ -98,7 +101,9 @@ export const boardroomSessions = sqliteTable("boardroom_sessions", {
     .notNull(),
   messageCounts: text("message_counts").notNull().default("{}"), // JSON: { character: count }
   flagAttempts: integer("flag_attempts").default(0),
+  accusationAttempts: integer("accusation_attempts").default(0),
   totalMessages: integer("total_messages").default(0),
+  sceneExaminations: text("scene_examinations").notNull().default("[]"), // JSON array of examined areas
   isComplete: integer("is_complete", { mode: "boolean" }).default(false),
   startedAt: text("started_at").$defaultFn(() => new Date().toISOString()),
   completedAt: text("completed_at"),
@@ -114,5 +119,6 @@ export const boardroomMessages = sqliteTable("boardroom_messages", {
   role: text("role").notNull(), // "user" or "assistant"
   content: text("content").notNull(),
   messageNumber: integer("message_number").notNull(), // per-character message index
+  mode: text("mode").notNull().default("private"), // "private", "group", or "confront"
   timestamp: text("timestamp").$defaultFn(() => new Date().toISOString()),
 });

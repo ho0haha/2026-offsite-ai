@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
       id: participants.id,
       name: participants.name,
       totalPoints: participants.totalPoints,
+      nukedAt: participants.nukedAt,
+      nukedBy: participants.nukedBy,
     })
     .from(participants)
     .where(eq(participants.eventId, eventId))
@@ -80,6 +82,8 @@ export async function GET(req: NextRequest) {
         name: p.name,
         totalPoints: p.totalPoints,
         maxTier,
+        nukedAt: p.nukedAt,
+        nukedBy: p.nukedBy,
       };
     })
   );

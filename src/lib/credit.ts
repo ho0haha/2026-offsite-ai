@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { challenges, submissions, participants } from "@/db/schema";
+import { challenges, submissions, participants, hintReveals } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -48,7 +48,23 @@ export async function creditChallenge(
     return { success: false, message: "Challenge not found" };
   }
 
-  const pointsAwarded = challenge.points;
+  // Calculate hint cost deduction for tier 4+ challenges
+  let totalHintCost = 0;
+  if (challenge.tier >= 4) {
+    const reveals = await db
+      .select({ cost: hintReveals.cost })
+      .from(hintReveals)
+      .where(
+        and(
+          eq(hintReveals.participantId, participantId),
+          eq(hintReveals.challengeId, challengeId)
+        )
+      )
+      .all();
+    totalHintCost = reveals.reduce((sum, r) => sum + r.cost, 0);
+  }
+
+  const pointsAwarded = Math.max(0, challenge.points - totalHintCost);
 
   // Record submission
   await db.insert(submissions)
@@ -77,10 +93,12 @@ export async function creditChallenge(
       .run();
   }
 
+  const hintNote = totalHintCost > 0 ? ` (${totalHintCost} pts deducted for hints)` : "";
+
   return {
     success: true,
     alreadySolved: false,
     pointsAwarded,
-    message: `Correct! +${pointsAwarded} points!`,
+    message: `Correct! +${pointsAwarded} points!${hintNote}`,
   };
 }

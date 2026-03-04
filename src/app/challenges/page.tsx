@@ -1,8 +1,214 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { TIER_BADGES } from "@/lib/tier-badges";
+
+// ─── Rank-Up Sound Effect ───
+
+function playRankUpSound() {
+  try {
+    const audio = new Audio("/rankup.mp3");
+    audio.volume = 0.7;
+    audio.play().catch(() => {});
+  } catch {
+    // Audio playback not available
+  }
+}
+
+// ─── Rank-Up Overlay Component ───
+
+function RankUpOverlay({
+  newTier,
+  unlockedChallenges,
+  onDismiss,
+}: {
+  newTier: number;
+  unlockedChallenges: { tier: number; title: string; id: string }[];
+  onDismiss: () => void;
+}) {
+  const badge = TIER_BADGES[Math.max(0, Math.min(newTier - 1, TIER_BADGES.length - 1))];
+  const soundPlayed = useRef(false);
+
+  useEffect(() => {
+    if (!soundPlayed.current) {
+      soundPlayed.current = true;
+      playRankUpSound();
+    }
+  }, []);
+
+  // Particle positions (pre-computed for deterministic layout)
+  const particles = Array.from({ length: 24 }, (_, i) => {
+    const angle = (i / 24) * Math.PI * 2;
+    const dist = 80 + (i % 3) * 40;
+    return {
+      px: Math.cos(angle) * dist,
+      py: Math.sin(angle) * dist,
+      delay: i * 0.03 + 0.4,
+      size: 3 + (i % 3) * 2,
+    };
+  });
+
+  // Light rays
+  const rays = Array.from({ length: 12 }, (_, i) => ({
+    angle: (i / 12) * 360,
+    delay: i * 0.04 + 0.3,
+  }));
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center cursor-pointer"
+      onClick={onDismiss}
+      style={{ animation: "rankup-overlay-in 0.4s ease-out forwards" }}
+    >
+      {/* Dark backdrop */}
+      <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" />
+
+      {/* White flash */}
+      <div
+        className="absolute inset-0 bg-white pointer-events-none"
+        style={{ animation: "rankup-flash 0.8s ease-out 0.45s forwards", opacity: 0 }}
+      />
+
+      {/* Center content */}
+      <div className="relative flex flex-col items-center">
+        {/* Expanding rings */}
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="absolute w-32 h-32 rounded-full border-2 pointer-events-none"
+            style={{
+              borderColor: `hsl(${badge.color.includes("sky") ? "var(--accent-cyan)" : badge.color.includes("teal") ? "170 80% 50%" : badge.color.includes("blue") ? "220 90% 60%" : badge.color.includes("purple") ? "270 80% 60%" : badge.color.includes("violet") ? "260 80% 60%" : badge.color.includes("amber") ? "40 90% 55%" : "350 80% 60%"} / 0.4)`,
+              animation: `rankup-ring-expand 1.2s ease-out ${0.5 + i * 0.2}s forwards`,
+              opacity: 0,
+            }}
+          />
+        ))}
+
+        {/* Light rays */}
+        <div className="absolute w-0 h-0 pointer-events-none">
+          {rays.map((ray, i) => (
+            <div
+              key={i}
+              className="absolute origin-bottom"
+              style={{
+                width: "2px",
+                height: "200px",
+                bottom: 0,
+                left: "-1px",
+                background: `linear-gradient(to top, hsl(var(--accent-cyan) / 0.4), transparent)`,
+                transform: `rotate(${ray.angle}deg)`,
+                animation: `rankup-ray 1.5s ease-out ${ray.delay}s forwards`,
+                opacity: 0,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Particles */}
+        {particles.map((p, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              width: p.size,
+              height: p.size,
+              background: i % 2 === 0 ? "hsl(var(--accent-cyan))" : "hsl(var(--accent-magenta))",
+              ["--px" as string]: `${p.px}px`,
+              ["--py" as string]: `${p.py}px`,
+              animation: `rankup-particle 1s ease-out ${p.delay}s forwards`,
+              opacity: 0,
+              boxShadow: `0 0 6px ${i % 2 === 0 ? "hsl(var(--accent-cyan))" : "hsl(var(--accent-magenta))"}`,
+            }}
+          />
+        ))}
+
+        {/* Badge */}
+        <div
+          className="relative"
+          style={{
+            animation: "rankup-badge-enter 1s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both",
+          }}
+        >
+          <img
+            src={badge.image}
+            alt={badge.name}
+            width={160}
+            height={160}
+            className="rounded-2xl drop-shadow-2xl"
+            style={{
+              filter: `drop-shadow(0 0 30px hsl(var(--accent-cyan) / 0.5)) drop-shadow(0 0 60px hsl(var(--accent-cyan) / 0.3))`,
+            }}
+          />
+        </div>
+
+        {/* TIER UP text */}
+        <div
+          className="mt-6 font-mono text-sm tracking-[0.2em] uppercase text-muted-foreground"
+          style={{ animation: "rankup-subtitle-reveal 0.6s ease-out 0.9s both" }}
+        >
+          Tier Promotion
+        </div>
+
+        {/* Tier name */}
+        <h2
+          className={`mt-2 text-3xl sm:text-4xl font-bold font-display ${badge.color}`}
+          style={{
+            animation: "rankup-text-reveal 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 1s both",
+            textShadow: `0 0 20px currentColor, 0 0 40px currentColor`,
+          }}
+        >
+          {badge.name}
+        </h2>
+
+        {/* Tier number */}
+        <div
+          className="mt-1 font-mono text-lg text-muted-foreground"
+          style={{ animation: "rankup-subtitle-reveal 0.6s ease-out 1.2s both" }}
+        >
+          Tier {newTier}
+        </div>
+
+        {/* Newly unlocked challenges */}
+        {unlockedChallenges.length > 0 && (
+          <div
+            className="mt-8 text-center"
+            style={{ animation: "rankup-challenges-reveal 0.6s ease-out 1.8s both" }}
+          >
+            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">
+              New Challenges Unlocked
+            </p>
+            <div className="space-y-1.5">
+              {unlockedChallenges.map((ch) => {
+                const b = TIER_BADGES[Math.max(0, Math.min(ch.tier - 1, TIER_BADGES.length - 1))];
+                return (
+                  <div key={ch.id} className="flex items-center gap-2 justify-center text-sm">
+                    <img src={b.imageSm} alt="" width={18} height={18} className="rounded" />
+                    <span className="text-foreground/80">{ch.title}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Dismiss hint */}
+        <p
+          className="mt-10 text-xs font-mono text-muted-foreground/50"
+          style={{ animation: "rankup-dismiss-hint 2s ease-out 2s both" }}
+        >
+          Click anywhere to continue
+        </p>
+      </div>
+    </div>
+  );
+}
+
+type HintMeta = {
+  text?: string;
+  cost: number;
+  revealed: boolean;
+};
 
 type Challenge = {
   id: string;
@@ -12,7 +218,9 @@ type Challenge = {
   difficulty: string;
   points: number;
   tier: number;
-  hints?: string[];
+  hints?: HintMeta[] | null;
+  effectivePoints?: number;
+  totalHintCost?: number;
   sortOrder: number;
   starterUrl?: string | null;
   solved?: boolean;
@@ -34,10 +242,18 @@ type Progress = {
 };
 
 const DIFFICULTY_COLORS: Record<string, string> = {
-  easy: "bg-green-500/20 text-green-400",
-  medium: "bg-yellow-500/20 text-yellow-400",
-  hard: "bg-red-500/20 text-red-400",
-  legendary: "bg-pink-500/20 text-pink-400",
+  easy: "bg-green-500/20 text-green-400 border border-green-500/30",
+  medium: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30",
+  hard: "bg-red-500/20 text-red-400 border border-red-500/30",
+  legendary:
+    "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-400/50 shadow-[0_0_8px_rgba(232,121,249,0.3)] animate-pulse-subtle",
+};
+
+const DIFFICULTY_PREFIX: Record<string, string> = {
+  easy: "[E]",
+  medium: "[M]",
+  hard: "[H]",
+  legendary: "[!!]",
 };
 
 function getBadge(tier: number) {
@@ -52,14 +268,16 @@ export default function ChallengesPage() {
   const [results, setResults] = useState<
     Record<string, { correct: boolean; message: string }>
   >({});
-  const [showHints, setShowHints] = useState<Record<string, number>>({});
+  const [revealingHint, setRevealingHint] = useState<string | null>(null);
   const [participant, setParticipant] = useState<{
     id: string;
     name: string;
   } | null>(null);
-  const [unlockNotification, setUnlockNotification] = useState<
-    { tier: number; title: string; id: string }[] | null
-  >(null);
+  const [rankUpData, setRankUpData] = useState<{
+    newTier: number;
+    challenges: { tier: number; title: string; id: string }[];
+  } | null>(null);
+  const prevTierRef = useRef<number | null>(null);
   const router = useRouter();
 
   function getToken(): string | null {
@@ -129,9 +347,13 @@ export default function ChallengesPage() {
       }));
 
       if (data.correct) {
-        if (data.newlyUnlocked?.length > 0) {
-          setUnlockNotification(data.newlyUnlocked);
-          setTimeout(() => setUnlockNotification(null), 8000);
+        const newlyUnlocked = data.newlyUnlocked as { tier: number; title: string; id: string }[] | undefined;
+        if (newlyUnlocked && newlyUnlocked.length > 0) {
+          // Determine the new max tier from unlocked challenges
+          const newMaxTier = Math.max(...newlyUnlocked.map((c) => c.tier));
+          if (prevTierRef.current !== null && newMaxTier > prevTierRef.current) {
+            setRankUpData({ newTier: newMaxTier, challenges: newlyUnlocked });
+          }
         }
         fetchChallenges();
         setFlagInputs((prev) => ({ ...prev, [challengeId]: "" }));
@@ -149,12 +371,55 @@ export default function ChallengesPage() {
     }
   }
 
+  async function handleRevealHint(challengeId: string, hintIndex: number, cost: number) {
+    const confirmed = window.confirm(
+      `Reveal this hint for -${cost} pts? This will reduce your score for this challenge.`
+    );
+    if (!confirmed) return;
+
+    const token = getToken();
+    if (!token) return;
+
+    setRevealingHint(`${challengeId}-${hintIndex}`);
+    try {
+      const res = await fetch("/api/hints", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ challengeId, hintIndex }),
+      });
+
+      if (res.ok) {
+        fetchChallenges();
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setRevealingHint(null);
+    }
+  }
+
+  // Track tier changes
+  useEffect(() => {
+    if (progress) {
+      if (prevTierRef.current === null) {
+        // Initial load - just store, don't trigger rank-up
+        prevTierRef.current = progress.currentMaxTier;
+      } else {
+        prevTierRef.current = progress.currentMaxTier;
+      }
+    }
+  }, [progress]);
+
   const currentBadge = progress ? getBadge(progress.currentMaxTier) : getBadge(1);
 
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b border-border">
+      <header className="sticky top-0 z-10 glass-strong border-b border-transparent"
+        style={{ borderImage: "linear-gradient(90deg, hsl(var(--accent-cyan)), hsl(var(--accent-magenta)), hsl(var(--accent-cyan))) 1" }}>
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Current tier badge */}
@@ -168,8 +433,13 @@ export default function ChallengesPage() {
               />
             )}
             <div>
-              <h1 className="text-xl font-bold">
-                <span className="text-primary">AI Coding</span> CTF
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <span className="font-mono-brand text-cyan-400/70 text-sm">{">_"}</span>
+                <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-300 bg-clip-text text-transparent animate-shimmer bg-[length:200%_auto]">
+                  AI Coding
+                </span>
+                {" "}
+                <span className="text-foreground">CTF</span>
               </h1>
               <p className="text-xs text-muted-foreground">
                 Welcome, {participant?.name}
@@ -182,20 +452,17 @@ export default function ChallengesPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {/* Tier Progress */}
+            {/* Tier Progress -- only show unlocked tiers */}
             {progress && (
               <div className="hidden sm:flex items-center gap-2">
-                {[1, 2, 3, 4, 5, 6, 7].map((t) => {
+                {Array.from({ length: progress.currentMaxTier }, (_, i) => i + 1).map((t) => {
                   const solved = progress.solvesByTier[String(t)] || 0;
                   const total = progress.totalByTier[String(t)] || 0;
-                  const unlocked = t <= progress.currentMaxTier;
                   const b = getBadge(t);
                   return (
                     <div
                       key={t}
-                      className={`text-center ${
-                        unlocked ? "" : "opacity-40"
-                      }`}
+                      className="text-center"
                       title={b.name}
                     >
                       <img
@@ -205,7 +472,7 @@ export default function ChallengesPage() {
                         height={24}
                         className="rounded mx-auto"
                       />
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-[10px] text-muted-foreground font-mono">
                         {solved}/{total}
                       </div>
                     </div>
@@ -214,204 +481,225 @@ export default function ChallengesPage() {
               </div>
             )}
             <div className="text-right">
-              <div className="text-2xl font-bold text-primary">
+              <div className="text-2xl font-bold font-mono neon-text text-cyan-400 tracking-wider"
+                style={{ textShadow: "0 0 10px hsl(var(--accent-cyan)), 0 0 20px hsl(var(--accent-cyan))" }}>
                 {progress?.totalPoints ?? 0}
               </div>
-              <div className="text-xs text-muted-foreground">points</div>
+              <div className="text-xs text-muted-foreground font-mono uppercase tracking-widest">pts</div>
             </div>
             <a
               href="/leaderboard"
-              className="px-3 py-1 text-sm border border-border rounded-md hover:bg-accent transition-colors"
+              className="px-3 py-1.5 text-sm font-mono border border-cyan-500/40 rounded-md hover:bg-cyan-500/10 hover:border-cyan-400/60 hover:shadow-glow-cyan transition-all text-cyan-400"
             >
-              Leaderboard
+              <span className="text-cyan-600 mr-1">{">"}</span>Leaderboard
             </a>
           </div>
         </div>
+        {/* Gradient separator below header */}
+        <div className="h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
       </header>
 
-      {/* Unlock Notification */}
-      {unlockNotification && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-green-500/20 border border-green-500/50 rounded-lg p-4 shadow-lg max-w-md animate-in fade-in slide-in-from-top-4">
-          <p className="text-green-400 font-semibold mb-2">
-            New challenges unlocked!
-          </p>
-          {unlockNotification.map((ch) => {
-            const b = getBadge(ch.tier);
-            return (
-              <p key={ch.id} className="text-sm text-green-300 flex items-center gap-2">
-                <img src={b.imageSm} alt="" width={20} height={20} className="rounded" />
-                Tier {ch.tier}: {ch.title}
-              </p>
-            );
-          })}
-        </div>
+      {/* Rank-Up Overlay */}
+      {rankUpData && (
+        <RankUpOverlay
+          newTier={rankUpData.newTier}
+          unlockedChallenges={rankUpData.challenges}
+          onDismiss={() => setRankUpData(null)}
+        />
       )}
 
-      {/* Challenge Cards by Tier */}
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
-        {tiers.map((tierGroup) => {
+      {/* Challenge Cards by Tier -- only unlocked tiers are returned */}
+      <main className="max-w-6xl mx-auto px-4 py-6 space-y-10">
+        {tiers.map((tierGroup, tierIdx) => {
           const badge = getBadge(tierGroup.tier);
           return (
-            <section key={tierGroup.tier}>
-              <div className="flex items-center gap-3 mb-3">
+            <section key={tierGroup.tier} className="animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: `${tierIdx * 100}ms`, animationFillMode: "both" }}>
+              {/* Tier Section Header */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-1 h-10 rounded-full ${badge.bgColor}`}
+                  style={{ boxShadow: `0 0 8px currentColor` }} />
                 <img
                   src={badge.imageSm}
                   alt={badge.name}
                   width={32}
                   height={32}
-                  className={`rounded ${!tierGroup.unlocked ? "opacity-40 grayscale" : ""}`}
+                  className="rounded"
                 />
-                <h2 className={`text-lg font-semibold ${badge.color}`}>
+                <h2 className={`text-lg font-semibold ${badge.color} flex items-center gap-2`}>
                   Tier {tierGroup.tier}
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                  <span className="text-sm font-normal text-muted-foreground">
                     {badge.name}
                   </span>
                 </h2>
-                {tierGroup.unlocked ? (
-                  <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
-                    Unlocked
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded text-xs bg-zinc-500/20 text-zinc-400">
-                    Locked
-                  </span>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {tierGroup.unlockRule}
+                <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400 border border-green-500/30 shadow-[0_0_6px_rgba(74,222,128,0.2)] animate-pulse-subtle">
+                  Unlocked
                 </span>
+                <span className="text-xs text-muted-foreground font-mono">
+                  {"// "}{tierGroup.unlockRule}
+                </span>
+                {/* Circuit-line decoration */}
+                <div className="flex-1 h-px bg-gradient-to-r from-current to-transparent opacity-20" />
               </div>
 
-              {tierGroup.unlocked ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {tierGroup.challenges.map((ch) => (
-                    <div
-                      key={ch.id}
-                      className={`border rounded-lg p-4 transition-all ${
-                        ch.solved
-                          ? "border-green-500/50 bg-green-500/5"
-                          : "border-border bg-card"
-                      }`}
-                    >
-                      {/* Card Header */}
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-base">
-                          {ch.solved && (
-                            <span className="text-green-400 mr-1">&#10003;</span>
-                          )}
+              <div className="grid gap-4 md:grid-cols-2">
+                {tierGroup.challenges.map((ch, chIdx) => (
+                  <div
+                    key={ch.id}
+                    className={`glass rounded-lg p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] flex flex-col ${
+                      ch.solved
+                        ? "border-l-4 border-l-green-400 shadow-[0_0_12px_rgba(74,222,128,0.15)]"
+                        : `border-l-4 ${badge.borderColor}`
+                    }`}
+                    style={{
+                      animationDelay: `${tierIdx * 100 + chIdx * 60}ms`,
+                      animationFillMode: "both",
+                    }}
+                  >
+                    {/* Card Header */}
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold text-base flex items-center gap-2">
+                        {ch.solved ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 border border-green-500/40 text-green-400 text-xs font-bold shrink-0">
+                            &#10003;
+                          </span>
+                        ) : (
+                          <span className="font-mono text-xs text-muted-foreground/50 shrink-0">
+                            #{String(chIdx + 1).padStart(2, "0")}
+                          </span>
+                        )}
+                        <span className={ch.solved ? "text-green-300/80" : ""}>
                           {ch.title}
-                        </h3>
-                        <span className="text-lg font-bold text-primary ml-2 shrink-0">
-                          {ch.points} pts
                         </span>
-                      </div>
-
-                      {/* Badges */}
-                      <div className="flex gap-2 mb-3 flex-wrap">
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            DIFFICULTY_COLORS[ch.difficulty] || ""
-                          }`}
-                        >
-                          {ch.difficulty}
-                        </span>
-                        {ch.category && (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-500/20 text-zinc-400">
-                            {ch.category}
+                      </h3>
+                      <div className="text-right ml-2 shrink-0">
+                        {ch.tier >= 4 && (ch.totalHintCost ?? 0) > 0 ? (
+                          <>
+                            <span className="text-lg font-bold font-mono text-primary neon-text">
+                              {ch.effectivePoints}
+                              <span className="text-xs ml-1 text-muted-foreground">pts</span>
+                            </span>
+                            <span className="block text-xs text-muted-foreground line-through font-mono">
+                              {ch.points} pts
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-lg font-bold font-mono text-primary neon-text">
+                            {ch.points}
+                            <span className="text-xs ml-1 text-muted-foreground">pts</span>
                           </span>
                         )}
                       </div>
+                    </div>
 
-                      {/* Description */}
-                      {ch.description && (
-                        <p className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
-                          {ch.description}
-                        </p>
-                      )}
-
-                      {/* Starter Download */}
-                      <button
-                        onClick={async () => {
-                          const token = getToken();
-                          if (!token) return;
-                          try {
-                            const res = await fetch(
-                              `/api/starter/${ch.sortOrder}?format=zip`,
-                              {
-                                headers: {
-                                  Authorization: `Bearer ${token}`,
-                                },
-                              }
-                            );
-                            if (!res.ok) return;
-                            const blob = await res.blob();
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `challenge-${ch.sortOrder}-starter.zip`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                          } catch {
-                            // silently fail
-                          }
-                        }}
-                        className="text-sm text-primary underline mb-3 block text-left cursor-pointer hover:opacity-80"
+                    {/* Badges */}
+                    <div className="flex gap-2 mb-3 flex-wrap">
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-mono font-medium ${
+                          DIFFICULTY_COLORS[ch.difficulty] || ""
+                        }`}
                       >
-                        Download starter code
-                      </button>
+                        {DIFFICULTY_PREFIX[ch.difficulty] || ""} {ch.difficulty}
+                      </span>
+                      {ch.category && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-zinc-500/20 text-zinc-400 border border-zinc-500/20">
+                          {ch.category}
+                        </span>
+                      )}
+                    </div>
 
-                      {/* Hints */}
-                      {ch.hints && ch.hints.length > 0 && (
-                        <div className="mb-3">
-                          <button
-                            onClick={() =>
-                              setShowHints((prev) => ({
-                                ...prev,
-                                [ch.id]: Math.min(
-                                  (prev[ch.id] || 0) + 1,
-                                  ch.hints!.length
-                                ),
-                              }))
+                    {/* Description */}
+                    {ch.description && (
+                      <p className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
+                        {ch.description}
+                      </p>
+                    )}
+
+                    {/* Starter Download */}
+                    <button
+                      onClick={async () => {
+                        const token = getToken();
+                        if (!token) return;
+                        try {
+                          const res = await fetch(
+                            `/api/starter/${ch.sortOrder}?format=zip`,
+                            {
+                              headers: {
+                                Authorization: `Bearer ${token}`,
+                              },
                             }
-                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            {(showHints[ch.id] || 0) < ch.hints.length
-                              ? `Show hint (${showHints[ch.id] || 0}/${
-                                  ch.hints.length
-                                })`
-                              : `All hints shown`}
-                          </button>
-                          {(showHints[ch.id] || 0) > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {ch.hints
-                                .slice(0, showHints[ch.id])
-                                .map((hint, i) => (
-                                  <p
-                                    key={i}
-                                    className="text-xs bg-accent/50 p-2 rounded"
-                                  >
-                                    Hint {i + 1}: {hint}
-                                  </p>
-                                ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                          );
+                          if (!res.ok) return;
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `challenge-${ch.sortOrder}-starter.zip`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          // silently fail
+                        }
+                      }}
+                      className="mb-3 flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-mono bg-zinc-800/50 border border-zinc-700/50 text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-all cursor-pointer"
+                    >
+                      <span className="text-cyan-600">$</span>
+                      <span>download starter-code.zip</span>
+                      <span className="text-muted-foreground">{"\u2193"}</span>
+                    </button>
 
-                      {/* Play button for prison escape challenge */}
-                      {ch.sortOrder === 20 && !ch.solved && (
-                        <a
-                          href="/prison"
-                          className="inline-block px-6 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-md text-sm font-bold transition-colors mb-2"
-                        >
-                          Play
-                        </a>
-                      )}
+                    {/* Hints -- only for tier 4+ */}
+                    {ch.hints && ch.hints.length > 0 && (
+                      <div className="mb-3 space-y-2">
+                        <p className="text-xs font-mono font-medium text-muted-foreground flex items-center gap-1">
+                          <span className="text-yellow-500">{"//>"}</span> Hints (cost points):
+                        </p>
+                        {ch.hints.map((hint, i) => (
+                          <div key={i}>
+                            {hint.revealed ? (
+                              <div className="text-xs font-mono bg-green-500/5 border border-green-500/20 p-2.5 rounded">
+                                <span className="text-green-500 mr-1">[DECODED]</span>
+                                <span className="text-muted-foreground line-through mr-2">
+                                  -{hint.cost} pts
+                                </span>
+                                <span className="text-green-300/80">
+                                  Hint {i + 1}: {hint.text}
+                                </span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleRevealHint(ch.id, i, hint.cost)}
+                                disabled={revealingHint === `${ch.id}-${i}`}
+                                className="text-xs font-mono px-3 py-1.5 border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 rounded hover:bg-yellow-500/20 transition-colors disabled:opacity-50 flex items-center gap-2"
+                              >
+                                <span className="text-yellow-600">{"\u26A0"}</span>
+                                {revealingHint === `${ch.id}-${i}`
+                                  ? "Decrypting..."
+                                  : `Decrypt Hint ${i + 1} (-${hint.cost} pts)`}
+                                <span className="text-yellow-600/50">{"\uD83D\uDD12"}</span>
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-                      {/* Flag Submission */}
-                      {!ch.solved && ch.sortOrder !== 20 && (
-                        <div className="flex gap-2">
+                    {/* Play button for prison escape challenge */}
+                    {ch.sortOrder === 20 && !ch.solved && (
+                      <a
+                        href="/prison"
+                        className="inline-block px-6 py-2 mt-auto bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-md text-sm font-bold transition-all mb-2 shadow-glow-cyan hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+                      >
+                        {"> "}Play
+                      </a>
+                    )}
+
+                    {/* Flag Submission */}
+                    {!ch.solved && ch.sortOrder !== 20 && (
+                      <div className="flex gap-2 mt-auto pt-3">
+                        <div className="flex-1 relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-cyan-600 text-sm pointer-events-none">$</span>
                           <input
                             type="text"
                             placeholder={
@@ -430,26 +718,36 @@ export default function ChallengesPage() {
                             onKeyDown={(e) => {
                               if (e.key === "Enter") handleSubmit(ch.id);
                             }}
-                            className="flex-1 px-3 py-1.5 bg-background border border-input rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                            className="w-full pl-7 pr-3 py-1.5 terminal-input rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50"
                           />
-                          <button
-                            onClick={() => handleSubmit(ch.id)}
-                            disabled={submitting === ch.id}
-                            className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-                          >
-                            {submitting === ch.id ? "..." : "Submit"}
-                          </button>
                         </div>
-                      )}
+                        <button
+                          onClick={() => handleSubmit(ch.id)}
+                          disabled={submitting === ch.id}
+                          className="px-4 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-md text-sm font-mono font-medium hover:shadow-glow-cyan disabled:opacity-50 transition-all flex items-center gap-1"
+                        >
+                          {submitting === ch.id ? (
+                            <span className="flex items-center gap-1">
+                              <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <span>...</span>
+                            </span>
+                          ) : (
+                            "Submit"
+                          )}
+                        </button>
+                      </div>
+                    )}
 
-                      {/* Fallback token submission for prison escape */}
-                      {!ch.solved && ch.sortOrder === 20 && (
-                        <div className="mt-2">
-                          <details className="text-xs text-muted-foreground">
-                            <summary className="cursor-pointer hover:text-foreground">
-                              Have a token? Submit manually
-                            </summary>
-                            <div className="flex gap-2 mt-2">
+                    {/* Fallback token submission for prison escape */}
+                    {!ch.solved && ch.sortOrder === 20 && (
+                      <div className="mt-2">
+                        <details className="text-xs text-muted-foreground">
+                          <summary className="cursor-pointer hover:text-foreground font-mono">
+                            {"// "}Have a token? Submit manually
+                          </summary>
+                          <div className="flex gap-2 mt-2">
+                            <div className="flex-1 relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-cyan-600 text-sm pointer-events-none">$</span>
                               <input
                                 type="text"
                                 placeholder="CTF:..."
@@ -463,64 +761,51 @@ export default function ChallengesPage() {
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter") handleSubmit(ch.id);
                                 }}
-                                className="flex-1 px-3 py-1.5 bg-background border border-input rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                                className="w-full pl-7 pr-3 py-1.5 terminal-input rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50"
                               />
-                              <button
-                                onClick={() => handleSubmit(ch.id)}
-                                disabled={submitting === ch.id}
-                                className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-                              >
-                                {submitting === ch.id ? "..." : "Submit"}
-                              </button>
                             </div>
-                          </details>
-                        </div>
-                      )}
+                            <button
+                              onClick={() => handleSubmit(ch.id)}
+                              disabled={submitting === ch.id}
+                              className="px-4 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-md text-sm font-mono font-medium hover:shadow-glow-cyan disabled:opacity-50 transition-all flex items-center gap-1"
+                            >
+                              {submitting === ch.id ? (
+                                <span className="flex items-center gap-1">
+                                  <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  <span>...</span>
+                                </span>
+                              ) : (
+                                "Submit"
+                              )}
+                            </button>
+                          </div>
+                        </details>
+                      </div>
+                    )}
 
-                      {/* Result */}
-                      {results[ch.id] && (
-                        <p
-                          className={`text-sm mt-2 ${
-                            results[ch.id].correct
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }`}
-                        >
-                          {results[ch.id].message}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                /* Locked Tier - Show preview cards */
-                <div className="grid gap-4 md:grid-cols-2 opacity-50">
-                  {tierGroup.challenges.map((ch) => (
-                    <div
-                      key={ch.id}
-                      className="border border-border/50 rounded-lg p-4 bg-card/50"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-base text-muted-foreground">
-                          {ch.title}
-                        </h3>
-                        <span className="text-lg font-bold text-muted-foreground ml-2 shrink-0">
-                          {ch.points} pts
+                    {/* Result */}
+                    {results[ch.id] && (
+                      <p
+                        className={`text-sm font-mono mt-2 ${
+                          results[ch.id].correct
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                        style={{
+                          textShadow: results[ch.id].correct
+                            ? "0 0 8px rgba(74,222,128,0.5)"
+                            : "0 0 8px rgba(248,113,113,0.5)",
+                        }}
+                      >
+                        <span className="mr-1">
+                          {results[ch.id].correct ? "[OK]" : "[ERR]"}
                         </span>
-                      </div>
-                      <div className="flex gap-2">
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            DIFFICULTY_COLORS[ch.difficulty] || ""
-                          }`}
-                        >
-                          {ch.difficulty}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                        {results[ch.id].message}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </section>
           );
         })}

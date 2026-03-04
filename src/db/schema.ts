@@ -63,6 +63,15 @@ export const gameSessions = sqliteTable("game_sessions", {
   abandonedAt: text("abandoned_at"),
 });
 
+export const hintReveals = sqliteTable("hint_reveals", {
+  id: text("id").primaryKey(),
+  participantId: text("participant_id").references(() => participants.id),
+  challengeId: text("challenge_id").references(() => challenges.id),
+  hintIndex: integer("hint_index").notNull(),
+  cost: integer("cost").notNull(),
+  revealedAt: text("revealed_at").$defaultFn(() => new Date().toISOString()),
+});
+
 export const gameCommands = sqliteTable("game_commands", {
   id: text("id").primaryKey(),
   sessionId: text("session_id")

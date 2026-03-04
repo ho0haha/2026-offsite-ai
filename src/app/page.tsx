@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import OnboardingModal from "./onboarding-modal";
 
 export default function JoinPage() {
   const [name, setName] = useState("");
@@ -11,7 +12,6 @@ export default function JoinPage() {
   const [loading, setLoading] = useState(false);
   const [needsSecretKey, setNeedsSecretKey] = useState(false);
   const [onboarding, setOnboarding] = useState<{ key: string; token: string; participant: unknown; event: unknown } | null>(null);
-  const [copied, setCopied] = useState(false);
   const router = useRouter();
 
   // If we have a stored participant, pre-fill and show secret key field
@@ -88,57 +88,10 @@ export default function JoinPage() {
     router.push("/challenges");
   }
 
-  async function handleCopy() {
-    if (!onboarding) return;
-    try {
-      await navigator.clipboard.writeText(onboarding.key);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* fallback: user can manually select */ }
-  }
-
   // Onboarding screen — shown after first join
   if (onboarding) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold tracking-tight">
-              Welcome to the <span className="text-primary">CTF</span>
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              Your account has been created. Save your secret key below.
-            </p>
-          </div>
-
-          <div className="bg-card border-2 border-primary/50 rounded-lg p-6 space-y-4">
-            <p className="text-sm font-medium text-center">Your Secret Key</p>
-            <div className="bg-background border border-input rounded-md p-4 text-center">
-              <code className="text-2xl font-mono tracking-widest text-primary select-all">
-                {onboarding.key}
-              </code>
-            </div>
-            <button
-              onClick={handleCopy}
-              className="w-full py-2 px-4 border border-input rounded-md text-sm font-medium hover:bg-accent transition-colors"
-            >
-              {copied ? "Copied!" : "Copy to Clipboard"}
-            </button>
-            <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3">
-              <p className="text-sm text-destructive font-medium">
-                Save this key now! You will need it to log back in. It will not be shown again.
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={handleOnboardingComplete}
-            className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-md font-medium hover:opacity-90 transition-opacity"
-          >
-            I&apos;ve Saved My Key &mdash; Continue
-          </button>
-        </div>
-      </div>
+      <OnboardingModal data={onboarding} onComplete={handleOnboardingComplete} />
     );
   }
 

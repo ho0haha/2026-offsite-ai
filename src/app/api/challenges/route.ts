@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { challenges, submissions } from "@/db/schema";
+import { challenges, submissions, hintReveals } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { getParticipantTierStatus, getUnlockRule } from "@/lib/tiers";
@@ -47,6 +47,25 @@ export async function GET(req: NextRequest) {
     // Get tier status
     const tierStatus = await getParticipantTierStatus(participantId, eventId);
 
+    // Get all hint reveals for this participant
+    const reveals = await db
+      .select({
+        challengeId: hintReveals.challengeId,
+        hintIndex: hintReveals.hintIndex,
+        cost: hintReveals.cost,
+      })
+      .from(hintReveals)
+      .where(eq(hintReveals.participantId, participantId))
+      .all();
+
+    // Group reveals by challenge
+    const revealsByChallenge: Record<string, { hintIndex: number; cost: number }[]> = {};
+    for (const r of reveals) {
+      if (!r.challengeId) continue;
+      if (!revealsByChallenge[r.challengeId]) revealsByChallenge[r.challengeId] = [];
+      revealsByChallenge[r.challengeId].push({ hintIndex: r.hintIndex, cost: r.cost });
+    }
+
     // Group challenges by tier
     const tierMap: Record<number, typeof allChallenges> = {};
     for (const c of allChallenges) {
@@ -56,40 +75,55 @@ export async function GET(req: NextRequest) {
 
     const tiers = Object.entries(tierMap)
       .sort(([a], [b]) => Number(a) - Number(b))
+      .filter(([tierStr]) => {
+        const tierNum = Number(tierStr);
+        // Only include unlocked tiers
+        return tierNum <= tierStatus.maxTier;
+      })
       .map(([tierStr, tierChallenges]) => {
         const tierNum = Number(tierStr);
-        const unlocked = tierNum <= tierStatus.maxTier;
 
         return {
           tier: tierNum,
-          unlocked,
+          unlocked: true,
           unlockRule: getUnlockRule(tierNum),
           challenges: tierChallenges.map((c) => {
-            if (unlocked) {
-              return {
-                id: c.id,
-                title: c.title,
-                description: c.description,
-                category: c.category,
-                difficulty: c.difficulty,
-                points: c.points,
-                tier: c.tier,
-                hints: c.hints ? JSON.parse(c.hints) : [],
-                sortOrder: c.sortOrder,
-                starterUrl: c.starterUrl,
-                validationType: c.validationType,
-                solved: solvedSet.has(c.id),
-              };
+            const challengeReveals = revealsByChallenge[c.id] || [];
+            const totalHintCost = challengeReveals.reduce((sum, r) => sum + r.cost, 0);
+            const revealedIndices = new Set(challengeReveals.map((r) => r.hintIndex));
+
+            // Parse hints
+            const rawHints = c.hints ? JSON.parse(c.hints) : [];
+
+            // For tier 4+, include hint metadata with costs and reveal status
+            let hintsMeta: { text?: string; cost: number; revealed: boolean }[] | null = null;
+            if (c.tier >= 4 && rawHints.length > 0) {
+              hintsMeta = rawHints.map((h: { text: string; cost: number } | string, i: number) => {
+                const isObj = typeof h === "object" && h !== null;
+                const revealed = revealedIndices.has(i);
+                return {
+                  text: revealed ? (isObj ? h.text : h) : undefined,
+                  cost: isObj ? h.cost : 0,
+                  revealed,
+                };
+              });
             }
-            // Locked tier: return stub data only
+
             return {
               id: c.id,
               title: c.title,
-              points: c.points,
+              description: c.description,
+              category: c.category,
               difficulty: c.difficulty,
+              points: c.points,
               tier: c.tier,
+              hints: c.tier >= 4 ? hintsMeta : null,
+              effectivePoints: c.tier >= 4 ? Math.max(0, c.points - totalHintCost) : c.points,
+              totalHintCost: c.tier >= 4 ? totalHintCost : 0,
               sortOrder: c.sortOrder,
-              locked: true,
+              starterUrl: c.starterUrl,
+              validationType: c.validationType,
+              solved: solvedSet.has(c.id),
             };
           }),
         };

@@ -7,7 +7,7 @@ interface TerminalLine {
   text: string;
 }
 
-type TerminalMode = "prison" | "dos" | "wopr" | "target_select" | "launch";
+type TerminalMode = "prison" | "dos" | "wopr" | "target_select" | "launch" | "boot_menu";
 // WoprStage removed — now driven by LLM via /api/prison/wopr/talk
 
 interface NukeTarget {
@@ -215,55 +215,22 @@ export default function PrisonPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [terminalMode, targets, selectedTargetIdx]);
 
-  // WOPR boot key listener during boot sequence
+  // Boot menu key listener during boot sequence
   useEffect(() => {
     if (monitorState !== "booting") return;
 
     const handler = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "w" && woprBootWindowRef.current) {
+      if (e.key.toLowerCase() === "b" && woprBootWindowRef.current) {
         e.preventDefault();
         // Cancel remaining boot timeouts
         bootTimeoutsRef.current.forEach(clearTimeout);
         bootTimeoutsRef.current = [];
         woprBootWindowRef.current = false;
 
-        if (!modemConnected) {
-          // No modem — just fall through to DOS silently
-          setLines([]);
-          setTerminalMode("dos");
-          setMonitorState("ready");
-          setTimeout(() => {
-            addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
-            addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
-            addLine("dos", "");
-            addLine("dos", "C:\\FALKEN>");
-          }, 100);
-          return;
-        }
-
-        // Reset stale WOPR conversation
-        const token = getToken();
-        if (token) {
-          fetch("/api/prison/wopr/talk", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ reset: true }),
-          }).catch(() => {});
-        }
-
-        // Switch to WOPR mode
+        // Show boot device selection menu
         setLines([]);
-        setTerminalMode("wopr");
-        setMonitorState("ready");
-
-        setTimeout(async () => {
-          addLine("wopr", "");
-          await typewriterLine("wopr", "GREETINGS PROFESSOR FALKEN.", 60);
-          addLine("wopr", "");
-        }, 100);
+        setTerminalMode("boot_menu");
+        setSelectedBootIdx(0);
       }
     };
 
@@ -271,6 +238,68 @@ export default function PrisonPage() {
     return () => window.removeEventListener("keydown", handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monitorState]);
+
+  // Boot menu selection state
+  const [selectedBootIdx, setSelectedBootIdx] = useState(0);
+
+  // Boot menu keyboard handler
+  useEffect(() => {
+    if (terminalMode !== "boot_menu") return;
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedBootIdx((prev) => Math.max(0, prev - 1));
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedBootIdx((prev) => Math.min(1, prev + 1));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (selectedBootIdx === 0) {
+          // Boot from C:\ — Falken's drive → DOS shell
+          setTerminalMode("dos");
+          setMonitorState("ready");
+          setLines([]);
+          addLine("system", "Booting from Primary Slave: C:\\");
+          addLine("system", "");
+          setTimeout(() => {
+            setLines([]);
+            addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
+            addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
+            addLine("dos", "");
+            addLine("dos", "C:\\FALKEN>");
+          }, 800);
+        } else {
+          // Boot from D:\ — default, launch prison game
+          setLines([]);
+          setTerminalMode("prison");
+          setMonitorState("ready");
+          const token = getToken();
+          if (!token) {
+            addLine("error", "Not authenticated. Please join the CTF first.");
+            return;
+          }
+          startGame(token);
+        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        // Cancel — resume default boot (D:\)
+        setLines([]);
+        setTerminalMode("prison");
+        setMonitorState("ready");
+        const token = getToken();
+        if (!token) {
+          addLine("error", "Not authenticated. Please join the CTF first.");
+          return;
+        }
+        startGame(token);
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terminalMode, selectedBootIdx]);
 
   const startGame = async (token: string, restart = false) => {
     setIsLoading(true);
@@ -941,17 +970,17 @@ export default function PrisonPage() {
       { delay: 2400, text: "Extended Memory: 15360K OK" },
       { delay: 2800, text: "" },
       { delay: 3000, text: "Detecting IDE drives..." },
-      { delay: 3500, text: "  F12 for boot menu", dim: true },
-      { delay: 3800, text: "  Primary Master: QUANTUM FIREBALL 1.2GB" },
-      { delay: 4200, text: "  Primary Slave:  None" },
+      { delay: 3500, text: "  Press B for boot device menu", dim: true },
+      { delay: 3800, text: "  Primary Master: QUANTUM FIREBALL 1.2GB (D:)" },
+      { delay: 4200, text: "  Primary Slave:  MAXTOR 7120AT 120MB (C:)" },
       { delay: 4800, text: "" },
-      { delay: 5000, text: "Starting MS-DOS..." },
+      { delay: 5000, text: "Booting from Primary Master: D:\\" },
       { delay: 5600, text: "HIMEM.SYS loaded" },
       { delay: 6000, text: "EMM386.EXE loaded" },
       { delay: 6400, text: "MSCDEX.EXE v2.25 installed" },
       { delay: 7000, text: "" },
-      { delay: 7200, text: "C:\\FALKEN>autoexec" },
-      { delay: 7600, text: "C:\\FALKEN>prison.exe" },
+      { delay: 7200, text: "D:\\>autoexec" },
+      { delay: 7600, text: "D:\\>prison.exe" },
       { delay: 8000, text: "" },
       { delay: 8200, text: "Loading..." },
       { delay: 8600, text: "██████████████████████████ 100%" },
@@ -976,7 +1005,7 @@ export default function PrisonPage() {
     const woprWindowClose = setTimeout(() => {
       woprBootWindowRef.current = false;
       // Remove the boot menu hint line
-      setLines((prev) => prev.filter((l) => l.text !== "  F12 for boot menu"));
+      setLines((prev) => prev.filter((l) => l.text !== "  Press B for boot device menu"));
     }, 5000);
     bootTimeoutsRef.current.push(woprWindowClose);
 
@@ -1103,7 +1132,7 @@ export default function PrisonPage() {
   };
 
   const isInputDisabled = () => {
-    if (terminalMode === "target_select" || terminalMode === "launch") return true;
+    if (terminalMode === "target_select" || terminalMode === "launch" || terminalMode === "boot_menu") return true;
     if (terminalMode === "wopr" && woprLoading) return true;
     if (terminalMode === "prison") return isLoading || (cooldown > 0 && !gameOver);
     return false;
@@ -1184,11 +1213,63 @@ export default function PrisonPage() {
     );
   };
 
+  const BOOT_DEVICES = [
+    { label: "C:  MAXTOR 7120AT 120MB", drive: "C" },
+    { label: "D:  QUANTUM FIREBALL 1.2GB", drive: "D" },
+  ];
+
+  const renderBootMenu = () => {
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden px-3 py-2 font-mono text-sm z-10">
+        <div className="text-gray-400 text-xs mt-4 mb-1 text-center">
+          American Megatrends BIOS v3.31
+        </div>
+        <div className="text-white text-xs mb-4 text-center tracking-wider">
+          BOOT DEVICE MENU
+        </div>
+        <div className="text-gray-500 text-[10px] mb-3 text-center">
+          ────────────────────────────────────
+        </div>
+        <div className="flex-1">
+          {BOOT_DEVICES.map((dev, idx) => (
+            <div
+              key={dev.drive}
+              className={`py-1 px-4 cursor-pointer transition-colors text-xs ${
+                idx === selectedBootIdx
+                  ? "bg-blue-800 text-white"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+              onClick={() => {
+                setSelectedBootIdx(idx);
+              }}
+              onDoubleClick={() => {
+                setSelectedBootIdx(idx);
+                // Simulate Enter press
+                const enterEvent = new KeyboardEvent("keydown", { key: "Enter" });
+                window.dispatchEvent(enterEvent);
+              }}
+            >
+              <span className="inline-block w-4">
+                {idx === selectedBootIdx ? "\u25B6" : " "}
+              </span>
+              {dev.label}
+            </div>
+          ))}
+        </div>
+        <div className="text-gray-600 text-[10px] mt-4 text-center">
+          [\u2191\u2193] Select &nbsp;&nbsp; [ENTER] Boot &nbsp;&nbsp; [ESC] Default
+        </div>
+      </div>
+    );
+  };
+
   // Determine header text based on terminal mode
   const getHeaderText = () => {
     switch (terminalMode) {
       case "dos":
         return "C:\\FALKEN";
+      case "boot_menu":
+        return "BIOS";
       case "wopr":
       case "target_select":
       case "launch":
@@ -1353,9 +1434,11 @@ export default function PrisonPage() {
                 </div>
               </div>
 
-              {/* Target selection mode */}
+              {/* Full-screen overlay modes */}
               {terminalMode === "target_select" ? (
                 renderTargetSelect()
+              ) : terminalMode === "boot_menu" ? (
+                renderBootMenu()
               ) : (
                 <>
                   {/* Terminal output */}

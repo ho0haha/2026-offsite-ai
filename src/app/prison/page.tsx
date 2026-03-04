@@ -1222,19 +1222,32 @@ export default function PrisonPage() {
         />
 
         {/* Power button overlay on monitor bezel */}
-        {monitorState === "off" && (
-          <button
-            onClick={handlePowerOn}
-            className="absolute z-30 cursor-pointer hover:bg-white/10 rounded-full transition-colors"
-            style={{
-              left: "71%",
-              top: "80%",
-              width: "5%",
-              height: "5%",
-            }}
-            title="Power on"
-          />
-        )}
+        <button
+          onClick={() => {
+            if (monitorState === "off") {
+              handlePowerOn();
+            } else {
+              // Power off — cancel any pending timeouts
+              bootTimeoutsRef.current.forEach(clearTimeout);
+              bootTimeoutsRef.current = [];
+              launchTimeoutsRef.current.forEach(clearTimeout);
+              launchTimeoutsRef.current = [];
+              setLines([]);
+              setTerminalMode("prison");
+              setMonitorState("off");
+              setWoprLoading(false);
+              setLaunchInProgress(false);
+            }
+          }}
+          className="absolute z-30 cursor-pointer hover:bg-white/10 rounded-full transition-colors"
+          style={{
+            left: "71%",
+            top: "80%",
+            width: "5%",
+            height: "5%",
+          }}
+          title={monitorState === "off" ? "Power on" : "Power off"}
+        />
 
         {/* Screen content area - on top of the monitor, covering the gray screen */}
         <div

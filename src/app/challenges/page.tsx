@@ -259,10 +259,10 @@ const DIFFICULTY_PREFIX: Record<string, string> = {
   legendary: "[!!]",
 };
 
-const SOLVE_POSITION_BADGE: Record<number, { ordinal: string; icon: string; multiplier: number; color: string; glow: string }> = {
-  1: { ordinal: "1st", icon: "\uD83E\uDD47", multiplier: 1.3, color: "from-amber-400 to-yellow-300 text-amber-950", glow: "shadow-[0_0_20px_rgba(251,191,36,0.5),0_0_40px_rgba(251,191,36,0.3)]" },
-  2: { ordinal: "2nd", icon: "\uD83E\uDD48", multiplier: 1.2, color: "from-slate-300 to-zinc-200 text-slate-800", glow: "shadow-[0_0_16px_rgba(203,213,225,0.4),0_0_32px_rgba(203,213,225,0.2)]" },
-  3: { ordinal: "3rd", icon: "\uD83E\uDD49", multiplier: 1.1, color: "from-orange-400 to-amber-600 text-orange-950", glow: "shadow-[0_0_16px_rgba(251,146,60,0.4),0_0_32px_rgba(251,146,60,0.2)]" },
+const SOLVE_POSITION_BADGE: Record<number, { ordinal: string; image: string; multiplier: number; color: string; glow: string }> = {
+  1: { ordinal: "1st", image: "/medal-gold.png", multiplier: 1.3, color: "from-amber-400 to-yellow-300 text-amber-950", glow: "shadow-[0_0_20px_rgba(251,191,36,0.5),0_0_40px_rgba(251,191,36,0.3)]" },
+  2: { ordinal: "2nd", image: "/medal-silver.png", multiplier: 1.2, color: "from-slate-300 to-zinc-200 text-slate-800", glow: "shadow-[0_0_16px_rgba(203,213,225,0.4),0_0_32px_rgba(203,213,225,0.2)]" },
+  3: { ordinal: "3rd", image: "/medal-bronze.png", multiplier: 1.1, color: "from-orange-400 to-amber-600 text-orange-950", glow: "shadow-[0_0_16px_rgba(251,146,60,0.4),0_0_32px_rgba(251,146,60,0.2)]" },
 };
 
 function getBadge(tier: number) {
@@ -634,11 +634,18 @@ export default function ChallengesPage() {
                           const b = SOLVE_POSITION_BADGE[ch.solvePosition!];
                           const bonusPts = Math.round(ch.points * b.multiplier) - ch.points;
                           return (
-                            <div
-                              className={`mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gradient-to-r ${b.color} font-bold text-[11px] font-mono ${b.glow}`}
-                            >
-                              <span className="text-sm">{b.icon}</span>
-                              <span>{b.ordinal} +{bonusPts}pts</span>
+                            <div className="mt-2 flex flex-col items-center gap-1">
+                              <img
+                                src={b.image}
+                                alt={`${b.ordinal} solve`}
+                                width={36}
+                                height={36}
+                                className="rounded-full"
+                                style={{ filter: `drop-shadow(0 0 8px rgba(6,182,212,0.4))` }}
+                              />
+                              <span className={`px-2 py-0.5 rounded-md bg-gradient-to-r ${b.color} font-bold text-[10px] font-mono ${b.glow}`}>
+                                +{bonusPts}pts
+                              </span>
                             </div>
                           );
                         })()}

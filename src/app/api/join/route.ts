@@ -18,9 +18,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, joinCode, secretKey } = await req.json();
+    const body = await req.json();
+    const name = typeof body.name === "string" ? body.name : "";
+    const joinCode = typeof body.joinCode === "string" ? body.joinCode : "";
+    const secretKey = typeof body.secretKey === "string" ? body.secretKey : "";
 
-    if (!name?.trim() || !joinCode?.trim()) {
+    if (!name.trim() || !joinCode.trim()) {
       return NextResponse.json(
         { error: "Name and event code are required" },
         { status: 400 }
@@ -55,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       // Existing participant — require secret key
-      if (!secretKey?.trim()) {
+      if (!secretKey.trim()) {
         return NextResponse.json({
           error: "This name is already registered. Enter your secret key to log back in.",
           requiresSecretKey: true,

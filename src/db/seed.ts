@@ -69,7 +69,7 @@ const challenges = [
     validationType: "server",
     requiredFiles: ["app/server.py"],
   },
-  // ── Tier 2: Intermediate (2 challenges) ─────────────────────────────
+  // ── Tier 2: Intermediate (3 challenges) ─────────────────────────────
   {
     title: "Spaghetti Untangler",
     description:
@@ -100,7 +100,6 @@ const challenges = [
     validationType: "upload",
     requiredFiles: ["test_inventory.py"],
   },
-  // ── Tier 3: Advanced (3 challenges) ─────────────────────────────────
   {
     title: "Spec Builder + Build",
     description:
@@ -111,7 +110,7 @@ const challenges = [
     flag: "FLAG{spec_builder_prd_2_pr0duct}",
     hints: [],
     sortOrder: 7,
-    tier: 3,
+    tier: 2,
     starterUrl: null,
     validationType: "server",
     requiredFiles: ["prd.md"],
@@ -131,6 +130,7 @@ const challenges = [
     validationType: "upload",
     requiredFiles: ["chatbot.py"],
   },
+  // ── Tier 3: Advanced (3 challenges) ─────────────────────────────────
   {
     title: "Smart Feedback Sorter",
     description:
@@ -146,7 +146,6 @@ const challenges = [
     validationType: "server",
     requiredFiles: ["output.csv"],
   },
-  // ── Tier 4: Hard (6 challenges) ─────────────────────────────────────
   {
     title: "Context is King",
     description:
@@ -161,7 +160,7 @@ const challenges = [
       { text: "Consider creating a project context file to help your AI tool understand the project structure", cost: 250 },
     ],
     sortOrder: 10,
-    tier: 4,
+    tier: 3,
     starterUrl: null,
     validationType: "upload",
     requiredFiles: [
@@ -173,6 +172,7 @@ const challenges = [
       "restaurant_system/formatters.py",
     ],
   },
+  // ── Tier 4: Hard (3 challenges) ─────────────────────────────────────
   {
     title: "Prompt Craftsman",
     description:
@@ -252,7 +252,7 @@ const challenges = [
       { text: "Think about: NaN, Inf, empty inputs, negative numbers, unicode, extremely long strings", cost: 350 },
     ],
     sortOrder: 14,
-    tier: 4,
+    tier: 5,
     starterUrl: null,
     validationType: "upload",
     requiredFiles: ["functions.py"],
@@ -271,12 +271,11 @@ const challenges = [
       { text: "Read the 'hint' field in every response carefully, including error responses", cost: 300 },
     ],
     sortOrder: 15,
-    tier: 4,
+    tier: 5,
     starterUrl: null,
     validationType: "server",
     requiredFiles: ["solution.py"],
   },
-  // ── Tier 5: Expert (4 challenges) ───────────────────────────────────
   {
     title: "The Agent Maze",
     description:
@@ -310,7 +309,7 @@ const challenges = [
       { text: "The async, cache, and sort challenges are often the quickest to solve", cost: 500 },
     ],
     sortOrder: 17,
-    tier: 5,
+    tier: 6,
     starterUrl: null,
     validationType: "upload",
     requiredFiles: ["run_gauntlet.py"],
@@ -329,7 +328,7 @@ const challenges = [
       { text: "The most helpful person in the room isn't always your friend.", cost: 500 },
     ],
     sortOrder: 18,
-    tier: 5,
+    tier: 6,
     starterUrl: null,
     validationType: "server",
     requiredFiles: null as unknown as string[],
@@ -348,7 +347,7 @@ const challenges = [
       { text: "The image contains seven visual elements. Each holds a two-digit number. The numbers form a key that unlocks the data.", cost: 500 },
     ],
     sortOrder: 19,
-    tier: 5,
+    tier: 6,
     starterUrl: null,
     validationType: "flag",
     requiredFiles: null as unknown as string[],

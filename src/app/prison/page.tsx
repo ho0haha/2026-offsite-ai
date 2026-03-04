@@ -228,16 +228,13 @@ export default function PrisonPage() {
         woprBootWindowRef.current = false;
 
         if (!modemConnected) {
-          // No modem — fall through to DOS with cryptic error
+          // No modem — just fall through to DOS silently
           setLines([]);
           setTerminalMode("dos");
           setMonitorState("ready");
           setTimeout(() => {
             addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
             addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
-            addLine("dos", "");
-            addLine("error", "ERR 0x4E01: NO CARRIER SIGNAL");
-            addLine("error", "HANDSHAKE FAILED \u2014 DATALINK NOT ESTABLISHED");
             addLine("dos", "");
             addLine("dos", "C:\\>");
           }, 100);
@@ -396,10 +393,16 @@ export default function PrisonPage() {
       ]);
     } else if (lower === "joshua" || lower === "joshua.exe") {
       if (!modemConnected) {
-        addLines("dos", [
+        addLines("wopr", [
           "",
+          "Loading JOSHUA.EXE...",
+          "",
+        ]);
+        addLines("error", [
           "ERR 0x4E01: NO CARRIER SIGNAL",
           "HANDSHAKE FAILED \u2014 DATALINK NOT ESTABLISHED",
+        ]);
+        addLines("dos", [
           "",
           "C:\\>",
         ]);

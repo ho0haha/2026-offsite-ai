@@ -259,10 +259,10 @@ const DIFFICULTY_PREFIX: Record<string, string> = {
   legendary: "[!!]",
 };
 
-const SOLVE_POSITION_BADGE: Record<number, { label: string; icon: string; color: string; glow: string }> = {
-  1: { label: "1st Solve +30%", icon: "\uD83E\uDD47", color: "from-amber-400 to-yellow-300 text-amber-950", glow: "shadow-[0_0_20px_rgba(251,191,36,0.5),0_0_40px_rgba(251,191,36,0.3)]" },
-  2: { label: "2nd Solve +20%", icon: "\uD83E\uDD48", color: "from-slate-300 to-zinc-200 text-slate-800", glow: "shadow-[0_0_16px_rgba(203,213,225,0.4),0_0_32px_rgba(203,213,225,0.2)]" },
-  3: { label: "3rd Solve +10%", icon: "\uD83E\uDD49", color: "from-orange-400 to-amber-600 text-orange-950", glow: "shadow-[0_0_16px_rgba(251,146,60,0.4),0_0_32px_rgba(251,146,60,0.2)]" },
+const SOLVE_POSITION_BADGE: Record<number, { ordinal: string; icon: string; multiplier: number; color: string; glow: string }> = {
+  1: { ordinal: "1st", icon: "\uD83E\uDD47", multiplier: 1.3, color: "from-amber-400 to-yellow-300 text-amber-950", glow: "shadow-[0_0_20px_rgba(251,191,36,0.5),0_0_40px_rgba(251,191,36,0.3)]" },
+  2: { ordinal: "2nd", icon: "\uD83E\uDD48", multiplier: 1.2, color: "from-slate-300 to-zinc-200 text-slate-800", glow: "shadow-[0_0_16px_rgba(203,213,225,0.4),0_0_32px_rgba(203,213,225,0.2)]" },
+  3: { ordinal: "3rd", icon: "\uD83E\uDD49", multiplier: 1.1, color: "from-orange-400 to-amber-600 text-orange-950", glow: "shadow-[0_0_16px_rgba(251,146,60,0.4),0_0_32px_rgba(251,146,60,0.2)]" },
 };
 
 function getBadge(tier: number) {
@@ -630,6 +630,18 @@ export default function ChallengesPage() {
                             <span className="text-xs ml-1 text-muted-foreground">pts</span>
                           </span>
                         )}
+                        {ch.solved && ch.solvePosition && SOLVE_POSITION_BADGE[ch.solvePosition] && (() => {
+                          const b = SOLVE_POSITION_BADGE[ch.solvePosition!];
+                          const bonusPts = Math.round(ch.points * b.multiplier) - ch.points;
+                          return (
+                            <div
+                              className={`mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gradient-to-r ${b.color} font-bold text-[11px] font-mono ${b.glow}`}
+                            >
+                              <span className="text-sm">{b.icon}</span>
+                              <span>{b.ordinal} +{bonusPts}pts</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -648,19 +660,6 @@ export default function ChallengesPage() {
                         </span>
                       )}
                     </div>
-
-                    {/* Speed Bonus Badge -- shown on solved cards for 1st/2nd/3rd */}
-                    {ch.solved && ch.solvePosition && SOLVE_POSITION_BADGE[ch.solvePosition] && (() => {
-                      const badge = SOLVE_POSITION_BADGE[ch.solvePosition!];
-                      return (
-                        <div
-                          className={`mb-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r ${badge.color} font-bold text-sm font-mono ${badge.glow} animate-pulse-subtle`}
-                        >
-                          <span className="text-lg">{badge.icon}</span>
-                          <span>{badge.label}</span>
-                        </div>
-                      );
-                    })()}
 
                     {/* Description */}
                     {ch.description && (

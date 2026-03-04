@@ -517,24 +517,17 @@ export default function ChallengesPage() {
               </div>
             )}
             <div className="text-right">
-              <div className="flex items-baseline gap-1.5 justify-end">
-                <span className="text-2xl font-bold font-mono neon-text text-cyan-400 tracking-wider"
-                  style={{ textShadow: "0 0 10px hsl(var(--accent-cyan)), 0 0 20px hsl(var(--accent-cyan))" }}>
-                  {progress?.totalPoints ?? 0}
-                </span>
-                {(progress?.speedBonus ?? 0) > 0 && (
-                  <span className="text-sm font-bold font-mono text-amber-400"
-                    style={{ textShadow: "0 0 8px rgba(251,191,36,0.5)" }}>
-                    +{progress!.speedBonus}
-                  </span>
-                )}
+              <div className="text-2xl font-bold font-mono neon-text text-cyan-400 tracking-wider"
+                style={{ textShadow: "0 0 10px hsl(var(--accent-cyan)), 0 0 20px hsl(var(--accent-cyan))" }}>
+                {progress?.totalPoints ?? 0}
+                <span className="text-xs font-medium text-muted-foreground ml-1 tracking-widest">PTS</span>
               </div>
-              <div className="flex items-center gap-1.5 justify-end">
-                <span className="text-xs text-muted-foreground font-mono uppercase tracking-widest">pts</span>
-                {(progress?.speedBonus ?? 0) > 0 && (
-                  <span className="text-[10px] text-amber-400/70 font-mono uppercase tracking-wider">time bonus</span>
-                )}
-              </div>
+              {(progress?.speedBonus ?? 0) > 0 && (
+                <div className="text-[11px] font-mono text-amber-400/80 tracking-wide"
+                  style={{ textShadow: "0 0 6px rgba(251,191,36,0.3)" }}>
+                  incl. +{progress!.speedBonus} speed bonus
+                </div>
+              )}
             </div>
             <a
               href="/leaderboard"

@@ -304,6 +304,9 @@ function StepTierSystem() {
           <strong className="text-foreground">Tip:</strong> You don&apos;t need to complete every challenge in a tier to progress — tiers 3–6 only require 2 solves from the tier below. Focus on the challenges that play to your strengths.
         </p>
         <p className="text-xs text-muted-foreground">
+          <strong className="text-foreground">Speed bonus:</strong> The first 3 solvers of each challenge earn bonus points — 1st gets +30%, 2nd gets +20%, 3rd gets +10%. Solve fast to maximize your score!
+        </p>
+        <p className="text-xs text-muted-foreground">
           <strong className="text-foreground">Hints:</strong> Tier 4+ challenges have optional hints that cost points (-100 to -500 each). Tiers 1–3 have no hints — you&apos;re on your own!
         </p>
       </div>
@@ -394,6 +397,7 @@ function StepReady() {
             "50–1000 pts per challenge",
             "No penalty for wrong answers",
             "Tier 4+ hints cost points (-100 to -500)",
+            "Speed bonus: 1st solve +30%, 2nd +20%, 3rd +10%",
           ]}
         />
         <QuickRefCard

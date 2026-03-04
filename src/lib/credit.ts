@@ -4,9 +4,15 @@ import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 type CreditResult =
-  | { success: true; alreadySolved: false; pointsAwarded: number; message: string }
+  | { success: true; alreadySolved: false; pointsAwarded: number; solvePosition: number; message: string }
   | { success: true; alreadySolved: true; message: string }
   | { success: false; message: string };
+
+const SOLVE_BONUS: Record<number, { multiplier: number; label: string }> = {
+  1: { multiplier: 1.3, label: "1st solve bonus: +30%" },
+  2: { multiplier: 1.2, label: "2nd solve bonus: +20%" },
+  3: { multiplier: 1.1, label: "3rd solve bonus: +10%" },
+};
 
 /**
  * Shared logic to credit a challenge solve for a participant.
@@ -48,6 +54,23 @@ export async function creditChallenge(
     return { success: false, message: "Challenge not found" };
   }
 
+  // Count existing correct submissions for this challenge (across all participants)
+  const correctSolves = await db
+    .select({ id: submissions.id })
+    .from(submissions)
+    .where(
+      and(
+        eq(submissions.challengeId, challengeId),
+        eq(submissions.isCorrect, true)
+      )
+    )
+    .all();
+  const solvePosition = correctSolves.length + 1;
+
+  // Apply first-solver bonus
+  const bonus = SOLVE_BONUS[solvePosition];
+  const multiplier = bonus ? bonus.multiplier : 1;
+
   // Calculate hint cost deduction for tier 4+ challenges
   let totalHintCost = 0;
   if (challenge.tier >= 4) {
@@ -64,7 +87,7 @@ export async function creditChallenge(
     totalHintCost = reveals.reduce((sum, r) => sum + r.cost, 0);
   }
 
-  const pointsAwarded = Math.max(0, challenge.points - totalHintCost);
+  const pointsAwarded = Math.max(0, Math.round(challenge.points * multiplier) - totalHintCost);
 
   // Record submission
   await db.insert(submissions)
@@ -94,11 +117,13 @@ export async function creditChallenge(
   }
 
   const hintNote = totalHintCost > 0 ? ` (${totalHintCost} pts deducted for hints)` : "";
+  const bonusNote = bonus ? ` (${bonus.label})` : "";
 
   return {
     success: true,
     alreadySolved: false,
     pointsAwarded,
-    message: `Correct! +${pointsAwarded} points!${hintNote}`,
+    solvePosition,
+    message: `Correct! +${pointsAwarded} points!${bonusNote}${hintNote}`,
   };
 }

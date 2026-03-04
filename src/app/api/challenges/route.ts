@@ -44,6 +44,18 @@ export async function GET(req: NextRequest) {
       .all();
     const solvedSet = new Set(solved.map((s) => s.challengeId!));
 
+    // Get global solve counts per challenge (for first-solver bonus display)
+    const allCorrectSubmissions = await db
+      .select({ challengeId: submissions.challengeId })
+      .from(submissions)
+      .where(eq(submissions.isCorrect, true))
+      .all();
+    const solveCountMap: Record<string, number> = {};
+    for (const s of allCorrectSubmissions) {
+      if (!s.challengeId) continue;
+      solveCountMap[s.challengeId] = (solveCountMap[s.challengeId] || 0) + 1;
+    }
+
     // Get tier status
     const tierStatus = await getParticipantTierStatus(participantId, eventId);
 
@@ -124,6 +136,7 @@ export async function GET(req: NextRequest) {
               starterUrl: c.starterUrl,
               validationType: c.validationType,
               solved: solvedSet.has(c.id),
+              solveCount: solveCountMap[c.id] || 0,
             };
           }),
         };

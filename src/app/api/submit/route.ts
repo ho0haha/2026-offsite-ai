@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
         correct: true,
         alreadySolved: false,
         pointsAwarded: result.pointsAwarded,
+        solvePosition: result.solvePosition,
         message: result.message,
         newlyUnlocked,
       });
@@ -118,6 +119,7 @@ export async function POST(req: NextRequest) {
         correct: true,
         alreadySolved: false,
         pointsAwarded: result.pointsAwarded,
+        solvePosition: result.solvePosition,
         message: result.message,
         newlyUnlocked,
       });

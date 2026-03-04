@@ -157,6 +157,7 @@ export async function POST(req: NextRequest) {
       valid: true,
       alreadySolved: false,
       pointsAwarded: creditResult.pointsAwarded,
+      solvePosition: creditResult.solvePosition,
       message: creditResult.message,
       token,
       newlyUnlocked,

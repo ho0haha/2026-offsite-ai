@@ -225,6 +225,7 @@ type Challenge = {
   starterUrl?: string | null;
   solved?: boolean;
   validationType?: string | null;
+  solveCount?: number;
 };
 
 type TierGroup = {
@@ -255,6 +256,13 @@ const DIFFICULTY_PREFIX: Record<string, string> = {
   hard: "[H]",
   legendary: "[!!]",
 };
+
+function getNextBonus(solveCount: number): { label: string; color: string } | null {
+  if (solveCount === 0) return { label: "1st solve: +30%", color: "text-amber-300 bg-amber-500/15 border-amber-500/30" };
+  if (solveCount === 1) return { label: "2nd solve: +20%", color: "text-amber-400/80 bg-amber-500/10 border-amber-500/20" };
+  if (solveCount === 2) return { label: "3rd solve: +10%", color: "text-amber-400/60 bg-amber-500/8 border-amber-500/15" };
+  return null;
+}
 
 function getBadge(tier: number) {
   return TIER_BADGES[Math.max(0, Math.min(tier - 1, TIER_BADGES.length - 1))];
@@ -605,6 +613,14 @@ export default function ChallengesPage() {
                           {ch.category}
                         </span>
                       )}
+                      {!ch.solved && (() => {
+                        const bonus = getNextBonus(ch.solveCount ?? 0);
+                        return bonus ? (
+                          <span className={`px-2 py-0.5 rounded text-xs font-mono font-medium border ${bonus.color}`}>
+                            {bonus.label}
+                          </span>
+                        ) : null;
+                      })()}
                     </div>
 
                     {/* Description */}

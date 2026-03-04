@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
-import { requireAuth, requireModem } from "@/lib/auth";
-import { getParticipantTierStatus } from "@/lib/tiers";
+import { requireAuth, requireModem, requireTier7 } from "@/lib/auth";
 import { db } from "@/db";
 import { gameSessions, challenges } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
@@ -18,18 +17,13 @@ export async function POST(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
   const { participantId, eventId } = authResult;
 
+  // Tier 7 gate
+  const tierCheck = await requireTier7(participantId, eventId);
+  if (tierCheck) return tierCheck;
+
   // Modem gate — route is invisible until modem is activated
   const modemCheck = await requireModem(participantId);
   if (modemCheck) return modemCheck;
-
-  // Tier check — must be tier 5
-  const tierStatus = await getParticipantTierStatus(participantId, eventId);
-  if (tierStatus.maxTier < 5) {
-    return NextResponse.json(
-      { error: "You must reach Tier 5 to access this challenge." },
-      { status: 403 }
-    );
-  }
 
   // Check for restart flag
   const url = new URL(req.url);

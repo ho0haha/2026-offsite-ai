@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
-import { getParticipantTierStatus } from "@/lib/tiers";
+import { requireAuth, requireTier7 } from "@/lib/auth";
 import { db } from "@/db";
 import { participants } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -10,14 +9,9 @@ export async function POST(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
   const { participantId, eventId } = authResult;
 
-  // Require tier 5 to activate modem (same as prison/start)
-  const tierStatus = await getParticipantTierStatus(participantId, eventId);
-  if (tierStatus.maxTier < 5) {
-    return NextResponse.json(
-      { error: "You must reach Tier 5 to access this feature." },
-      { status: 403 }
-    );
-  }
+  // Require tier 7 to activate modem
+  const tierCheck = await requireTier7(participantId, eventId);
+  if (tierCheck) return tierCheck;
 
   await db
     .update(participants)

@@ -3,6 +3,7 @@ import { verifySessionToken } from "@/lib/crypto";
 import { db } from "@/db";
 import { participants } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { getParticipantTierStatus } from "@/lib/tiers";
 
 /**
  * Require a valid session token from the Authorization header.
@@ -48,5 +49,20 @@ export async function requireModem(
     return NextResponse.json({}, { status: 404 });
   }
 
+  return null;
+}
+
+/**
+ * Returns a 404 if the participant has not reached tier 7.
+ * Uses 404 (not 403) so the endpoint stays invisible.
+ */
+export async function requireTier7(
+  participantId: string,
+  eventId: string
+): Promise<NextResponse | null> {
+  const tierStatus = await getParticipantTierStatus(participantId, eventId);
+  if (tierStatus.maxTier < 7) {
+    return NextResponse.json({}, { status: 404 });
+  }
   return null;
 }

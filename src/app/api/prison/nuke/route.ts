@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, requireModem } from "@/lib/auth";
+import { requireAuth, requireModem, requireTier7 } from "@/lib/auth";
 import { db } from "@/db";
 import { participants } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -10,6 +10,10 @@ export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const { participantId, eventId } = auth;
+
+  // Tier 7 gate
+  const tierCheck = await requireTier7(participantId, eventId);
+  if (tierCheck) return tierCheck;
 
   const modemCheck = await requireModem(participantId);
   if (modemCheck) return modemCheck;

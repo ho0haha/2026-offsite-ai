@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
-import { requireAuth, requireModem } from "@/lib/auth";
+import { requireAuth, requireModem, requireTier7 } from "@/lib/auth";
 import { db } from "@/db";
 import { gameSessions, gameCommands, challenges } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -21,6 +21,10 @@ export async function POST(req: NextRequest) {
   const authResult = requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
   const { participantId, eventId } = authResult;
+
+  // Tier 7 gate
+  const tierCheck = await requireTier7(participantId, eventId);
+  if (tierCheck) return tierCheck;
 
   // Modem gate — route is invisible until modem is activated
   const modemCheck = await requireModem(participantId);

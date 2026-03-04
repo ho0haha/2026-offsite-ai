@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, requireModem } from "@/lib/auth";
+import { requireAuth, requireModem, requireTier7 } from "@/lib/auth";
 import {
   talkToWopr,
   startJoshuaSession,
@@ -16,7 +16,11 @@ const RATE_LIMIT_MS = 2000;
 export async function POST(req: NextRequest) {
   const authResult = requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
-  const { participantId } = authResult;
+  const { participantId, eventId } = authResult;
+
+  // Tier 7 gate
+  const tierCheck = await requireTier7(participantId, eventId);
+  if (tierCheck) return tierCheck;
 
   // Modem gate
   const modemCheck = await requireModem(participantId);

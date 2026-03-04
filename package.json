@@ -13,6 +13,7 @@
     "build:starters": "tsx scripts/build-starter-bundles.ts ../2026-offsite-ai-challenges"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@libsql/client": "^0.14.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

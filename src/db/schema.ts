@@ -83,3 +83,36 @@ export const gameCommands = sqliteTable("game_commands", {
   roomId: text("room_id").notNull(),
   timestamp: text("timestamp").$defaultFn(() => new Date().toISOString()),
 });
+
+// ---------------------------------------------------------------------------
+// Challenge 18: The Boardroom
+// ---------------------------------------------------------------------------
+
+export const boardroomSessions = sqliteTable("boardroom_sessions", {
+  id: text("id").primaryKey(),
+  participantId: text("participant_id")
+    .references(() => participants.id)
+    .notNull(),
+  eventId: text("event_id")
+    .references(() => events.id)
+    .notNull(),
+  messageCounts: text("message_counts").notNull().default("{}"), // JSON: { character: count }
+  flagAttempts: integer("flag_attempts").default(0),
+  totalMessages: integer("total_messages").default(0),
+  isComplete: integer("is_complete", { mode: "boolean" }).default(false),
+  startedAt: text("started_at").$defaultFn(() => new Date().toISOString()),
+  completedAt: text("completed_at"),
+  abandonedAt: text("abandoned_at"),
+});
+
+export const boardroomMessages = sqliteTable("boardroom_messages", {
+  id: text("id").primaryKey(),
+  sessionId: text("session_id")
+    .references(() => boardroomSessions.id)
+    .notNull(),
+  character: text("character").notNull(),
+  role: text("role").notNull(), // "user" or "assistant"
+  content: text("content").notNull(),
+  messageNumber: integer("message_number").notNull(), // per-character message index
+  timestamp: text("timestamp").$defaultFn(() => new Date().toISOString()),
+});

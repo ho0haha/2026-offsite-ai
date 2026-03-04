@@ -8,4 +8,5 @@ data/*
 temp-next/
 .claude/
 
+local.db
 .vercel

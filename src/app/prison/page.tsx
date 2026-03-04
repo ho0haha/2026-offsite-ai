@@ -1069,36 +1069,38 @@ export default function PrisonPage() {
       setModemConnecting(false);
       setModemConnected(true);
 
-      const token = getToken();
-      const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+      if (terminalMode === "dos") {
+        // DOS mode — simple connection confirmation, no API dump
+        setLines([]);
+        setTimeout(() => {
+          addLine("response", "CONNECT 56000/V.90");
+          addLine("system", "CONNECTION ESTABLISHED.");
+          addLine("dos", "");
+          addLine("dos", "C:\\FALKEN>");
+        }, 200);
+      } else {
+        // Prison mode — show compact API endpoint info
+        const token = getToken();
+        const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-      // Clear and show the endpoint info
-      setLines([]);
-      setTimeout(() => {
-        addLine("system", "========================================");
-        addLine("system", "  CONNECTION ESTABLISHED — 56Kbps");
-        addLine("system", "========================================");
-        addLine("system", "");
-        addLine("system", "PRISON I/O ENDPOINT ACTIVE");
-        addLine("system", "Your AI can now interact with the prison terminal.");
-        addLine("system", "");
-        addLine("response", "POST  " + baseUrl + "/api/prison/command");
-        addLine("system", "");
-        addLine("system", "Headers:");
-        addLine("response", '  Authorization: Bearer ' + (token || "<your-ctf-token>"));
-        addLine("response", '  Content-Type: application/json');
-        addLine("system", "");
-        addLine("system", "Body:");
-        addLine("response", '  { "sessionId": "' + (sessionId || "<session-id>") + '",');
-        addLine("response", '    "command": "<your-command>" }');
-        addLine("system", "");
-        addLine("system", "Available endpoints:");
-        addLine("response", "  POST /api/prison/start     — Start/resume session");
-        addLine("response", "  POST /api/prison/command   — Send a command");
-        addLine("response", "  GET  /api/prison/status    — Check game status");
-        addLine("system", "");
-        addLine("system", "Feed the response back to your AI. Escape the prison.");
-      }, 200);
+        setLines([]);
+        setTimeout(() => {
+          addLine("system", "CONNECTION ESTABLISHED — 56Kbps");
+          addLine("system", "");
+          addLine("system", "PRISON I/O ENDPOINT ACTIVE");
+          addLine("system", "Use your AI to interact with the prison terminal.");
+          addLine("response", "POST " + baseUrl + "/api/prison/command");
+          addLine("response", "  Auth: Bearer " + (token || "<token>"));
+          addLine("response", '  Body: { "sessionId": "' + (sessionId || "<id>") + '", "command": "..." }');
+          addLine("system", "");
+          addLine("system", "Endpoints:");
+          addLine("response", "  POST /api/prison/start    — Start/resume");
+          addLine("response", "  POST /api/prison/command  — Send command");
+          addLine("response", "  GET  /api/prison/status   — Check status");
+          addLine("system", "");
+          addLine("system", "Feed responses to your AI. Escape the prison.");
+        }, 200);
+      }
     });
   };
 
@@ -1376,7 +1378,7 @@ export default function PrisonPage() {
           {monitorState === "booting" && (
             <div
               ref={terminalRef}
-              className="flex-1 overflow-y-auto px-3 py-2 font-mono text-xs z-10 min-h-0"
+              className="flex-1 overflow-y-auto px-3 py-2 font-mono text-[11px] z-10 min-h-0"
             >
               {lines.map((line, i) => (
                 <div key={i} className={`whitespace-pre-wrap mb-0.5 ${getLineColor(line)}`}>
@@ -1445,7 +1447,7 @@ export default function PrisonPage() {
                   {/* Terminal output */}
                   <div
                     ref={terminalRef}
-                    className="flex-1 overflow-y-auto px-3 py-2 font-mono text-xs z-10 min-h-0"
+                    className="flex-1 overflow-y-auto px-3 py-2 font-mono text-[11px] z-10 min-h-0"
                     onClick={() => inputRef.current?.focus()}
                   >
                     {lines.map((line, i) => (
@@ -1476,7 +1478,7 @@ export default function PrisonPage() {
                     onSubmit={handleSubmit}
                     className="border-t border-green-900/50 px-3 py-2 flex items-center gap-2 z-10 shrink-0"
                   >
-                    <span className={`font-mono ${terminalMode === "dos" ? "text-gray-300" : terminalMode === "wopr" ? "text-green-400" : "text-green-500"}`}>
+                    <span className={`font-mono text-[11px] ${terminalMode === "dos" ? "text-gray-300" : terminalMode === "wopr" ? "text-green-400" : "text-green-500"}`}>
                       {getPromptPrefix()}
                     </span>
                     <input
@@ -1486,7 +1488,7 @@ export default function PrisonPage() {
                       onChange={(e) => setInput(e.target.value)}
                       disabled={isInputDisabled()}
                       placeholder={getPlaceholder()}
-                      className={`flex-1 bg-transparent font-mono text-xs outline-none caret-green-400 ${
+                      className={`flex-1 bg-transparent font-mono text-[11px] outline-none caret-green-400 ${
                         terminalMode === "dos"
                           ? "text-gray-200 placeholder-gray-700"
                           : terminalMode === "wopr"

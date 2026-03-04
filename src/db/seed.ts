@@ -384,6 +384,8 @@ async function main() {
   // Drop and recreate tables (handles schema migration from tool -> tier)
   await client.batch(
     [
+      `DROP TABLE IF EXISTS boardroom_messages`,
+      `DROP TABLE IF EXISTS boardroom_sessions`,
       `DROP TABLE IF EXISTS game_commands`,
       `DROP TABLE IF EXISTS game_sessions`,
       `DROP TABLE IF EXISTS hint_reveals`,
@@ -412,7 +414,10 @@ async function main() {
         joined_at TEXT DEFAULT (datetime('now')),
         total_points INTEGER DEFAULT 0,
         secret_key TEXT,
-        modem_activated INTEGER DEFAULT 0
+        modem_activated INTEGER DEFAULT 0,
+        nuked_at TEXT,
+        nuked_by TEXT,
+        nukes_launched INTEGER DEFAULT 0
       )`,
       `CREATE TABLE IF NOT EXISTS challenges (
         id TEXT PRIMARY KEY,
@@ -466,6 +471,30 @@ async function main() {
         command TEXT NOT NULL,
         response TEXT NOT NULL,
         room_id TEXT NOT NULL,
+        timestamp TEXT DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS boardroom_sessions (
+        id TEXT PRIMARY KEY,
+        participant_id TEXT NOT NULL REFERENCES participants(id),
+        event_id TEXT NOT NULL REFERENCES events(id),
+        message_counts TEXT NOT NULL DEFAULT '{}',
+        flag_attempts INTEGER DEFAULT 0,
+        accusation_attempts INTEGER DEFAULT 0,
+        total_messages INTEGER DEFAULT 0,
+        scene_examinations TEXT NOT NULL DEFAULT '[]',
+        is_complete INTEGER DEFAULT 0,
+        started_at TEXT DEFAULT (datetime('now')),
+        completed_at TEXT,
+        abandoned_at TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS boardroom_messages (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES boardroom_sessions(id),
+        character TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        message_number INTEGER NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'private',
         timestamp TEXT DEFAULT (datetime('now'))
       )`,
     ],

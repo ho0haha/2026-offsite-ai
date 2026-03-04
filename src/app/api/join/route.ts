@@ -119,7 +119,8 @@ export async function POST(req: NextRequest) {
       maxAge: 60 * 60 * 24,
     });
     return res;
-  } catch {
+  } catch (error) {
+    console.error("POST /api/join error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

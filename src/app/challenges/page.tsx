@@ -238,6 +238,7 @@ type TierGroup = {
 type Progress = {
   currentMaxTier: number;
   totalPoints: number;
+  speedBonus: number;
   solvesByTier: Record<string, number>;
   totalByTier: Record<string, number>;
 };
@@ -516,11 +517,24 @@ export default function ChallengesPage() {
               </div>
             )}
             <div className="text-right">
-              <div className="text-2xl font-bold font-mono neon-text text-cyan-400 tracking-wider"
-                style={{ textShadow: "0 0 10px hsl(var(--accent-cyan)), 0 0 20px hsl(var(--accent-cyan))" }}>
-                {progress?.totalPoints ?? 0}
+              <div className="flex items-baseline gap-1.5 justify-end">
+                <span className="text-2xl font-bold font-mono neon-text text-cyan-400 tracking-wider"
+                  style={{ textShadow: "0 0 10px hsl(var(--accent-cyan)), 0 0 20px hsl(var(--accent-cyan))" }}>
+                  {progress?.totalPoints ?? 0}
+                </span>
+                {(progress?.speedBonus ?? 0) > 0 && (
+                  <span className="text-sm font-bold font-mono text-amber-400"
+                    style={{ textShadow: "0 0 8px rgba(251,191,36,0.5)" }}>
+                    +{progress!.speedBonus}
+                  </span>
+                )}
               </div>
-              <div className="text-xs text-muted-foreground font-mono uppercase tracking-widest">pts</div>
+              <div className="flex items-center gap-1.5 justify-end">
+                <span className="text-xs text-muted-foreground font-mono uppercase tracking-widest">pts</span>
+                {(progress?.speedBonus ?? 0) > 0 && (
+                  <span className="text-[10px] text-amber-400/70 font-mono uppercase tracking-wider">time bonus</span>
+                )}
+              </div>
             </div>
             <a
               href="/leaderboard"

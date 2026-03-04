@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { challenges, submissions, hintReveals } from "@/db/schema";
+import { challenges, submissions, hintReveals, participants } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { getParticipantTierStatus, getUnlockRule } from "@/lib/tiers";
@@ -142,17 +142,30 @@ export async function GET(req: NextRequest) {
         };
       });
 
-    // Compute total points from solved challenges
-    let totalPoints = 0;
+    // Fetch real totalPoints from participants table (includes speed bonuses and hint deductions)
+    const participant = await db
+      .select({ totalPoints: participants.totalPoints })
+      .from(participants)
+      .where(eq(participants.id, participantId))
+      .get();
+
+    // Compute base total (points minus hint costs, no speed bonuses)
+    let baseTotal = 0;
     for (const c of allChallenges) {
-      if (solvedSet.has(c.id)) totalPoints += c.points;
+      if (solvedSet.has(c.id)) {
+        const hintCost = (revealsByChallenge[c.id] || []).reduce((s, r) => s + r.cost, 0);
+        baseTotal += Math.max(0, c.points - hintCost);
+      }
     }
+    const realTotal = participant?.totalPoints ?? 0;
+    const speedBonus = realTotal - baseTotal;
 
     return NextResponse.json({
       tiers,
       progress: {
         currentMaxTier: tierStatus.maxTier,
-        totalPoints,
+        totalPoints: realTotal,
+        speedBonus,
         solvesByTier: tierStatus.solvesByTier,
         totalByTier: tierStatus.totalByTier,
       },

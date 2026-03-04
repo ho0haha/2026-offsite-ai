@@ -438,7 +438,7 @@ export default function PrisonPage() {
           { type: "file", name: "MAZE.DAT", size: 8192, date: "06-07-83  03:14a" },
           { type: "file", name: "LEARNING.LOG", size: 34201, date: "06-07-83  03:14a", content: "ITERATION 4,291,003\nGAME: TIC-TAC-TOE\nRESULT: DRAW\nCONCLUSION: NO WINNING STRATEGY EXISTS\n\n... EXTRAPOLATING TO FULL THEATER SIMULATION ..." },
         ]},
-        { type: "dir", name: "JOSHUA", date: "06-07-83  03:14a", children: [
+        { type: "dir", name: "PROJECT", date: "06-07-83  03:14a", children: [
           { type: "file", name: "JOSHUA.EXE", size: 512000, date: "06-07-83  03:14a" },
         ]},
       ]},

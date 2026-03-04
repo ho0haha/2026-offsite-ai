@@ -426,16 +426,16 @@ export default function PrisonPage() {
     { type: "file", name: "AUTOEXEC.BAT", size: 42, date: "03-15-97  12:00a", content: "@ECHO OFF\nD:\\PRISON.EXE" },
     { type: "file", name: "CONFIG.SYS", size: 128, date: "03-15-97  12:00a", content: "DEVICE=C:\\DOS\\HIMEM.SYS\nDEVICE=C:\\DOS\\EMM386.EXE\nFILES=40\nBUFFERS=20" },
     { type: "dir", name: "DOS", date: "03-15-97  12:00a", children: [
-      { type: "file", name: "HIMEM.SYS", size: 29136, date: "09-30-93  06:20a" },
-      { type: "file", name: "EMM386.EXE", size: 120926, date: "09-30-93  06:20a" },
+      { type: "file", name: "HIMEM.SYS", size: 29136, date: "09-30-93  06:20a", content: "\x00\x00\x00HIMEM\x00\x00v3.10\x00\x00XMS DRIVER\x00\x00(binary)" },
+      { type: "file", name: "EMM386.EXE", size: 120926, date: "09-30-93  06:20a", content: "\x00\x00EMM386\x00EXPANDED MEMORY MANAGER\x00v4.49\x00\x00(binary)" },
       { type: "file", name: "EDIT.COM", size: 413, date: "09-30-93  06:20a" },
       { type: "file", name: "FORMAT.COM", size: 22974, date: "09-30-93  06:20a" },
-      { type: "file", name: "MSCDEX.EXE", size: 25377, date: "09-30-93  06:20a" },
+      { type: "file", name: "MSCDEX.EXE", size: 25377, date: "09-30-93  06:20a", content: "\x00MSCDEX\x00CD-ROM EXTENSIONS\x00v2.25\x00\x00(binary)" },
     ]},
     { type: "dir", name: "USERS", date: "06-07-83  03:14a", children: [
       { type: "dir", name: "SFALKEN", date: "06-07-83  03:14a", children: [
         { type: "dir", name: "RESEARCH", date: "06-07-83  03:14a", children: [
-          { type: "file", name: "MAZE.DAT", size: 8192, date: "06-07-83  03:14a" },
+          { type: "file", name: "MAZE.DAT", size: 8192, date: "06-07-83  03:14a", content: "####S#######\n#  #   #   #\n# ## # # # #\n#    # # # #\n###### # # #\n#      # # #\n# ###### # #\n#        # #\n# ######## #\n#          #\n######E#####" },
           { type: "file", name: "LEARNING.LOG", size: 34201, date: "06-07-83  03:14a", content: "ITERATION 4,291,003\nGAME: TIC-TAC-TOE\nRESULT: DRAW\nCONCLUSION: NO WINNING STRATEGY EXISTS\n\n... EXTRAPOLATING TO FULL THEATER SIMULATION ..." },
         ]},
         { type: "dir", name: "PROJECT", date: "06-07-83  03:14a", children: [
@@ -543,6 +543,86 @@ export default function PrisonPage() {
           dosPrompt(),
         ]);
       }
+    } else if (lower === "edit" || lower === "edit.com") {
+      const file = findFileAtPath(dosPath, "EDIT.COM");
+      if (!file) {
+        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        return;
+      }
+      addLines("dos", [
+        "",
+        "MS-DOS Editor Version 2.0",
+        "Copyright (C) Microsoft Corp 1993",
+        "",
+        "ERROR: Insufficient conventional memory.",
+        "Required: 202,416 bytes  Available: 0 bytes",
+        "",
+        dosPrompt(),
+      ]);
+    } else if (lower === "format" || lower === "format.com" || lower.startsWith("format ")) {
+      const file = findFileAtPath(dosPath, "FORMAT.COM");
+      if (!file) {
+        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        return;
+      }
+      addLines("dos", [
+        "",
+        "WARNING: ALL DATA ON NON-REMOVABLE DISK",
+        "DRIVE C: WILL BE LOST!",
+        "Proceed with Format (Y/N)?",
+        "",
+        "FORMAT ABORTED — DRIVE IS WRITE-PROTECTED",
+        "",
+        dosPrompt(),
+      ]);
+    } else if (lower === "emm386" || lower === "emm386.exe") {
+      const file = findFileAtPath(dosPath, "EMM386.EXE");
+      if (!file) {
+        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        return;
+      }
+      addLines("dos", [
+        "",
+        "MICROSOFT Expanded Memory Manager 386  Version 4.49",
+        "Copyright Microsoft Corporation 1986-1993",
+        "",
+        "EMM386 active. EMS memory available: 0K",
+        "Total upper memory available: 0K",
+        "  EMM386 is not currently providing EMS/VCPI services.",
+        "",
+        dosPrompt(),
+      ]);
+    } else if (lower === "himem" || lower === "himem.sys") {
+      const file = findFileAtPath(dosPath, "HIMEM.SYS");
+      if (!file) {
+        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        return;
+      }
+      addLines("dos", [
+        "",
+        "HIMEM: DOS XMS Driver, Version 3.10",
+        "XMS Specification Version 3.0",
+        "Extended Memory Available: 15360K",
+        "  HMA is in use.",
+        "",
+        dosPrompt(),
+      ]);
+    } else if (lower === "mscdex" || lower === "mscdex.exe") {
+      const file = findFileAtPath(dosPath, "MSCDEX.EXE");
+      if (!file) {
+        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        return;
+      }
+      addLines("dos", [
+        "",
+        "MSCDEX Version 2.25",
+        "Copyright (C) Microsoft Corp 1986-1993",
+        "",
+        "  Drive E:  = Driver OEMCD001  unit 0",
+        "  No disc in drive.",
+        "",
+        dosPrompt(),
+      ]);
     } else if (lower === "joshua" || lower === "joshua.exe") {
       // Only works if JOSHUA.EXE is in current directory
       const file = findFileAtPath(dosPath, "JOSHUA.EXE");

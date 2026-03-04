@@ -212,7 +212,6 @@ export default function PrisonPage() {
         setLines([]);
         addLine("dos", "LAUNCH ABORTED.");
         addLine("dos", "");
-        addLine("dos", "C:\\>");
       }
     };
 
@@ -275,8 +274,7 @@ export default function PrisonPage() {
             addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
             addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
             addLine("dos", "");
-            addLine("dos", "C:\\>");
-          }, 800);
+              }, 800);
         } else {
           // Boot from D:\ — default, launch prison game
           setLines([]);
@@ -525,7 +523,6 @@ export default function PrisonPage() {
         `         ${files.length + dirs.length} file(s)    ${totalSize.toLocaleString()} bytes`,
         `         0 dir(s)     524,288,000 bytes free`,
         "",
-        dosPrompt(),
       ]);
     } else if (lower.startsWith("cd ") || lower.startsWith("cd\\") || lower === "cd..") {
       let target = lower === "cd.." ? ".." : cmd.trim().slice(3).trim();
@@ -535,18 +532,16 @@ export default function PrisonPage() {
       if (result) {
         setDosPath(result.path);
         addLine("dos", "");
-        addLine("dos", `${result.path}>`);
       } else {
         addLines("dos", [
           "Invalid directory",
           "",
-          dosPrompt(),
         ]);
       }
     } else if (lower === "edit" || lower === "edit.com") {
       const file = findFileAtPath(dosPath, "EDIT.COM");
       if (!file) {
-        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        addLines("dos", ["Bad command or file name", ""]);
         return;
       }
       addLines("dos", [
@@ -557,12 +552,11 @@ export default function PrisonPage() {
         "ERROR: Insufficient conventional memory.",
         "Required: 202,416 bytes  Available: 0 bytes",
         "",
-        dosPrompt(),
       ]);
     } else if (lower === "format" || lower === "format.com" || lower.startsWith("format ")) {
       const file = findFileAtPath(dosPath, "FORMAT.COM");
       if (!file) {
-        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        addLines("dos", ["Bad command or file name", ""]);
         return;
       }
       addLines("dos", [
@@ -573,12 +567,11 @@ export default function PrisonPage() {
         "",
         "FORMAT ABORTED — DRIVE IS WRITE-PROTECTED",
         "",
-        dosPrompt(),
       ]);
     } else if (lower === "emm386" || lower === "emm386.exe") {
       const file = findFileAtPath(dosPath, "EMM386.EXE");
       if (!file) {
-        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        addLines("dos", ["Bad command or file name", ""]);
         return;
       }
       addLines("dos", [
@@ -590,12 +583,11 @@ export default function PrisonPage() {
         "Total upper memory available: 0K",
         "  EMM386 is not currently providing EMS/VCPI services.",
         "",
-        dosPrompt(),
       ]);
     } else if (lower === "himem" || lower === "himem.sys") {
       const file = findFileAtPath(dosPath, "HIMEM.SYS");
       if (!file) {
-        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        addLines("dos", ["Bad command or file name", ""]);
         return;
       }
       addLines("dos", [
@@ -605,12 +597,11 @@ export default function PrisonPage() {
         "Extended Memory Available: 15360K",
         "  HMA is in use.",
         "",
-        dosPrompt(),
       ]);
     } else if (lower === "mscdex" || lower === "mscdex.exe") {
       const file = findFileAtPath(dosPath, "MSCDEX.EXE");
       if (!file) {
-        addLines("dos", ["Bad command or file name", "", dosPrompt()]);
+        addLines("dos", ["Bad command or file name", ""]);
         return;
       }
       addLines("dos", [
@@ -621,7 +612,6 @@ export default function PrisonPage() {
         "  Drive E:  = Driver OEMCD001  unit 0",
         "  No disc in drive.",
         "",
-        dosPrompt(),
       ]);
     } else if (lower === "joshua" || lower === "joshua.exe") {
       // Only works if JOSHUA.EXE is in current directory
@@ -630,7 +620,6 @@ export default function PrisonPage() {
         addLines("dos", [
           "Bad command or file name",
           "",
-          dosPrompt(),
         ]);
         return;
       }
@@ -646,7 +635,6 @@ export default function PrisonPage() {
         ]);
         addLines("dos", [
           "",
-          dosPrompt(),
         ]);
         return;
       }
@@ -677,26 +665,22 @@ export default function PrisonPage() {
         addLines("dos", [
           "File not found",
           "",
-          dosPrompt(),
         ]);
       } else if (file.content) {
         addLines("dos", [
           "",
           ...file.content.split("\n"),
           "",
-          dosPrompt(),
         ]);
       } else {
         addLines("dos", [
           "",
           `${file.name} - ${file.size} bytes`,
           "",
-          dosPrompt(),
         ]);
       }
     } else if (lower === "cls") {
       setLines([]);
-      addLine("dos", dosPrompt());
     } else if (lower === "shutdown" || lower === "shutdown.exe" || lower === "shutdown /s") {
       addLines("dos", [
         "",
@@ -711,19 +695,16 @@ export default function PrisonPage() {
       addLines("dos", [
         "Cannot exit. System locked.",
         "",
-        dosPrompt(),
       ]);
     } else if (lower === "help" || lower === "?") {
       addLines("dos", [
         "MS-DOS Version 6.22",
         "",
-        dosPrompt(),
       ]);
     } else {
       addLines("dos", [
         "Bad command or file name",
         "",
-        dosPrompt(),
       ]);
     }
   };
@@ -744,7 +725,6 @@ export default function PrisonPage() {
     addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
     addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
     addLine("dos", "");
-    addLine("dos", "C:\\>");
   };
 
   // WOPR conversation handler — LLM-powered
@@ -898,7 +878,6 @@ export default function PrisonPage() {
       if (validTargets.length === 0) {
         addLine("wopr", "NO VALID TARGETS DETECTED.");
         addLine("wopr", "");
-        addLine("dos", "C:\\>");
         setTerminalMode("dos");
         setDosPath("C:\\");
         return;
@@ -1064,7 +1043,6 @@ export default function PrisonPage() {
     setTerminalMode("dos");
         setDosPath("C:\\");
     setLaunchInProgress(false);
-    addLine("dos", "C:\\>");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1291,8 +1269,7 @@ export default function PrisonPage() {
           addLine("response", "CONNECT 56000/V.90");
           addLine("system", "CONNECTION ESTABLISHED.");
           addLine("dos", "");
-          addLine("dos", "C:\\>");
-        }, 200);
+          }, 200);
       } else {
         // Prison mode — show compact API endpoint info
         const token = getToken();
@@ -1676,45 +1653,71 @@ export default function PrisonPage() {
                     {isLoading && terminalMode === "prison" && (
                       <div className="text-green-700 animate-pulse">Processing...</div>
                     )}
+
+                    {/* DOS inline input — renders inside the scroll area */}
+                    {terminalMode === "dos" && (
+                      <form
+                        onSubmit={handleSubmit}
+                        className="flex items-center gap-0 mt-0.5"
+                      >
+                        <span className="font-mono text-[11px] text-gray-300 whitespace-pre">
+                          {getPromptPrefix()}
+                        </span>
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          disabled={isInputDisabled()}
+                          className="flex-1 bg-transparent font-mono text-[11px] outline-none caret-gray-300 text-gray-200"
+                          autoFocus
+                          autoComplete="off"
+                          spellCheck={false}
+                        />
+                      </form>
+                    )}
                   </div>
 
-                  {/* Cooldown bar */}
-                  {cooldown > 0 && terminalMode === "prison" && (
-                    <div className="h-1 bg-green-900/30 z-10 shrink-0">
-                      <div
-                        className="h-full bg-green-600 transition-all duration-1000 ease-linear"
-                        style={{ width: `${(cooldown / 3) * 100}%` }}
-                      />
-                    </div>
-                  )}
+                  {/* Non-DOS modes: fixed input bar at bottom */}
+                  {terminalMode !== "dos" && (
+                    <>
+                      {/* Cooldown bar */}
+                      {cooldown > 0 && terminalMode === "prison" && (
+                        <div className="h-1 bg-green-900/30 z-10 shrink-0">
+                          <div
+                            className="h-full bg-green-600 transition-all duration-1000 ease-linear"
+                            style={{ width: `${(cooldown / 3) * 100}%` }}
+                          />
+                        </div>
+                      )}
 
-                  {/* Input area */}
-                  <form
-                    onSubmit={handleSubmit}
-                    className="border-t border-green-900/50 px-3 py-2 flex items-center gap-2 z-10 shrink-0"
-                  >
-                    <span className={`font-mono text-[11px] ${terminalMode === "dos" ? "text-gray-300" : terminalMode === "wopr" ? "text-green-400" : "text-green-500"}`}>
-                      {getPromptPrefix()}
-                    </span>
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      disabled={isInputDisabled()}
-                      placeholder={getPlaceholder()}
-                      className={`flex-1 bg-transparent font-mono text-[11px] outline-none caret-green-400 ${
-                        terminalMode === "dos"
-                          ? "text-gray-200 placeholder-gray-700"
-                          : terminalMode === "wopr"
-                          ? "text-green-300 placeholder-green-800"
-                          : "text-green-400 placeholder-green-800"
-                      }`}
-                      autoFocus
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </form>
+                      {/* Input area */}
+                      <form
+                        onSubmit={handleSubmit}
+                        className="border-t border-green-900/50 px-3 py-2 flex items-center gap-2 z-10 shrink-0"
+                      >
+                        <span className={`font-mono text-[11px] ${terminalMode === "wopr" ? "text-green-400" : "text-green-500"}`}>
+                          {getPromptPrefix()}
+                        </span>
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          disabled={isInputDisabled()}
+                          placeholder={getPlaceholder()}
+                          className={`flex-1 bg-transparent font-mono text-[11px] outline-none caret-green-400 ${
+                            terminalMode === "wopr"
+                              ? "text-green-300 placeholder-green-800"
+                              : "text-green-400 placeholder-green-800"
+                          }`}
+                          autoFocus
+                          autoComplete="off"
+                          spellCheck={false}
+                        />
+                      </form>
+                    </>
+                  )}
                 </>
               )}
             </>

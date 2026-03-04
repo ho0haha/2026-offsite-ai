@@ -85,7 +85,6 @@ export async function POST(req: NextRequest) {
       participantId,
       eventId,
       messageCounts: "{}",
-      flagAttempts: 0,
       accusationAttempts: 0,
       totalMessages: 0,
       sceneExaminations: "[]",

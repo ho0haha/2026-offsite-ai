@@ -384,6 +384,8 @@ async function main() {
   // Drop and recreate tables (handles schema migration from tool -> tier)
   await client.batch(
     [
+      `DROP TABLE IF EXISTS murder_messages`,
+      `DROP TABLE IF EXISTS murder_sessions`,
       `DROP TABLE IF EXISTS boardroom_messages`,
       `DROP TABLE IF EXISTS boardroom_sessions`,
       `DROP TABLE IF EXISTS game_commands`,
@@ -473,12 +475,11 @@ async function main() {
         room_id TEXT NOT NULL,
         timestamp TEXT DEFAULT (datetime('now'))
       )`,
-      `CREATE TABLE IF NOT EXISTS boardroom_sessions (
+      `CREATE TABLE IF NOT EXISTS murder_sessions (
         id TEXT PRIMARY KEY,
         participant_id TEXT NOT NULL REFERENCES participants(id),
         event_id TEXT NOT NULL REFERENCES events(id),
         message_counts TEXT NOT NULL DEFAULT '{}',
-        flag_attempts INTEGER DEFAULT 0,
         accusation_attempts INTEGER DEFAULT 0,
         total_messages INTEGER DEFAULT 0,
         scene_examinations TEXT NOT NULL DEFAULT '[]',
@@ -487,9 +488,9 @@ async function main() {
         completed_at TEXT,
         abandoned_at TEXT
       )`,
-      `CREATE TABLE IF NOT EXISTS boardroom_messages (
+      `CREATE TABLE IF NOT EXISTS murder_messages (
         id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL REFERENCES boardroom_sessions(id),
+        session_id TEXT NOT NULL REFERENCES murder_sessions(id),
         character TEXT NOT NULL,
         role TEXT NOT NULL,
         content TEXT NOT NULL,

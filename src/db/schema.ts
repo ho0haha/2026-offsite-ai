@@ -88,10 +88,10 @@ export const gameCommands = sqliteTable("game_commands", {
 });
 
 // ---------------------------------------------------------------------------
-// Challenge 18: The Murder Mystery
+// Challenge 18: Only Murders at 127.0.0.1
 // ---------------------------------------------------------------------------
 
-export const murderSessions = sqliteTable("boardroom_sessions", {
+export const murderSessions = sqliteTable("murder_sessions", {
   id: text("id").primaryKey(),
   participantId: text("participant_id")
     .references(() => participants.id)
@@ -100,7 +100,6 @@ export const murderSessions = sqliteTable("boardroom_sessions", {
     .references(() => events.id)
     .notNull(),
   messageCounts: text("message_counts").notNull().default("{}"), // JSON: { character: count }
-  flagAttempts: integer("flag_attempts").default(0),
   accusationAttempts: integer("accusation_attempts").default(0),
   totalMessages: integer("total_messages").default(0),
   sceneExaminations: text("scene_examinations").notNull().default("[]"), // JSON array of examined areas
@@ -110,7 +109,7 @@ export const murderSessions = sqliteTable("boardroom_sessions", {
   abandonedAt: text("abandoned_at"),
 });
 
-export const murderMessages = sqliteTable("boardroom_messages", {
+export const murderMessages = sqliteTable("murder_messages", {
   id: text("id").primaryKey(),
   sessionId: text("session_id")
     .references(() => murderSessions.id)

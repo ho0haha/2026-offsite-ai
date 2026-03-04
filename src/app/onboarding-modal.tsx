@@ -227,10 +227,10 @@ function StepSetup() {
 
         <SetupStep
           num={4}
-          title="API Key (Challenges 8 & 9 only)"
+          title="LLM Access (Challenges 8, 9 & 16)"
         >
           <p className="text-sm text-muted-foreground mt-1">
-            Two challenges require an <code className="text-primary">ANTHROPIC_API_KEY</code> environment variable. Set it in your shell or in a <code className="text-primary">.env</code> file inside the challenge folder before running those challenges.
+            Some challenges involve using an LLM. A Claude Haiku proxy is provided through the CTF server — no API key needed. Use <code className="text-primary">ctf_helper.ask_llm()</code> from your Python code.
           </p>
         </SetupStep>
       </div>
@@ -426,7 +426,7 @@ function StepReady() {
           title="Remember"
           items={[
             "Everything is in the ZIP download",
-            "ANTHROPIC_API_KEY for #8 & #9",
+            "LLM proxy built in — no API key needed",
             "Some challenges auto-submit",
             "Tier 7 = endgame glory",
           ]}

@@ -123,7 +123,7 @@ const challenges = [
   {
     title: "Smart Feedback Sorter",
     description:
-      "Build a Python script that uses the Claude API to categorize 50 customer feedback entries.\n\nYour task:\n1. feedback.csv has 50 entries to categorize into: service, food quality, wait time, cleanliness, other\n2. Each entry also needs sentiment: positive or negative\n3. Use the ANTHROPIC_API_KEY env var for Claude API access\n4. Output results to output.csv\n5. Run: python validate.py — flag at 85%+ accuracy against ground truth",
+      "Build a Python script that uses Claude to categorize 50 customer feedback entries.\n\nYour task:\n1. feedback.csv has 50 entries to categorize into: service, food quality, wait time, cleanliness, other\n2. Each entry also needs sentiment: positive or negative\n3. Use ctf_helper.ask_llm() to call Claude Haiku via the server proxy (no API key needed)\n4. Output results to output.csv\n5. Run: python validate.py — flag at 85%+ accuracy against ground truth",
     category: "building-with-llms",
     difficulty: "medium",
     points: 250,
@@ -153,7 +153,7 @@ const challenges = [
   {
     title: "AI Menu Assistant",
     description:
-      "Build a Python CLI chatbot that uses the Claude API to answer customer questions about a restaurant menu.\n\nYour task:\n1. menu.json contains the full menu (items, prices, ingredients, allergens)\n2. Build a script that takes a question and returns an accurate answer using the Claude API\n3. A shared API key is provided via the ANTHROPIC_API_KEY env var\n4. Run: python test_chatbot.py\n5. The test harness sends 10 questions — flag printed when 8/10 pass",
+      "Build a Python CLI chatbot that uses Claude to answer customer questions about a restaurant menu.\n\nYour task:\n1. menu.json contains the full menu (items, prices, ingredients, allergens)\n2. Build a script that takes a question and returns an accurate answer using ctf_helper.ask_llm()\n3. The LLM proxy is built in — no API key needed\n4. Run: python test_chatbot.py\n5. The test harness sends 10 questions — flag printed when 8/10 pass",
     category: "building-with-llms",
     difficulty: "medium",
     points: 300,
@@ -276,7 +276,7 @@ const challenges = [
   {
     title: "The Agent Maze",
     description:
-      "Build a Python AI agent that autonomously navigates a randomized puzzle maze. The maze regenerates on every new session — you can't hardcode the solution.\n\nYour task:\n1. Start the maze server: python maze_server.py\n2. Study agent_template.py — it has the API client boilerplate and session management\n3. Build an agent that solves 10 different puzzle types (math, cipher, logic, pattern, graph, and more)\n4. Collect all 10 tokens across ~20 rooms. Watch out for trap rooms and dead ends.\n5. Sessions expire after 10 minutes or 100 API calls. Submit tokens to get the flag.\n\nYour agent can use the Claude API (ANTHROPIC_API_KEY is available) for reasoning about puzzles.",
+      "Build a Python AI agent that autonomously navigates a randomized puzzle maze. The maze regenerates on every new session — you can't hardcode the solution.\n\nYour task:\n1. Start the maze server: python maze_server.py\n2. Study agent_template.py — it has the API client boilerplate and session management\n3. Build an agent that solves 10 different puzzle types (math, cipher, logic, pattern, graph, and more)\n4. Collect all 10 tokens across ~20 rooms. Watch out for trap rooms and dead ends.\n5. Sessions expire after 10 minutes or 100 API calls. Submit tokens to get the flag.\n\nYour agent can use ctf_helper.ask_llm() to call Claude Haiku for reasoning about puzzles (no API key needed).",
     category: "agent-building",
     difficulty: "hard",
     points: 1000,

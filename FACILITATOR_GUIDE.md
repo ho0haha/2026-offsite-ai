@@ -4,7 +4,7 @@
 
 - [ ] **Leaderboard platform deployed** — Vercel or local machine ready
 - [ ] **Challenge repo accessible** — Participants can clone `https://github.com/ho0haha/2026-offsite-ai-challenges`
-- [ ] **Claude API key generated** — For challenges 8 & 9 (shared key, set spend limit)
+- [ ] **LLM proxy verified** — Server proxies Claude Haiku for challenges 8, 9 & 16 (no API key sharing needed)
 - [ ] **Test run completed** — Full dry-run with 2-3 test users
 - [ ] **Projector/big screen** ready for `/leaderboard` view
 - [ ] **WiFi confirmed** — All participants can reach the platform + GitHub
@@ -16,7 +16,7 @@
 - [ ] Open `/admin` — confirm event is **Active** with join code ** **
 - [ ] Open `/leaderboard` on the projector screen
 - [ ] Verify join flow: go to `/` on your phone, enter name + YUMCTF, see challenges
-- [ ] Have the Claude API key ready to share: `export ANTHROPIC_API_KEY=sk-ant-...`
+- [ ] Verify LLM proxy works: participants use `ctf_helper.ask_llm()` — no API key needed
 - [ ] Print or project the WiFi credentials
 
 ## Event Day Schedule
@@ -73,21 +73,19 @@
 | 5 | Spaghetti Untangler | `FLAG{spaghetti_untangled_cl34n_c0de}` | Must pass both behavior AND structural tests |
 | 6 | Test Factory | `FLAG{test_factory_90_percent_c0v3rag3}` | Need `pytest-cov` installed |
 | 7 | Spec Builder | `FLAG{spec_builder_prd_2_pr0duct}` | Two phases: PRD first, then implementation |
-| 8 | AI Menu Assistant | `FLAG{ai_menu_assistant_8_of_10}` | Needs ANTHROPIC_API_KEY env var |
-| 9 | Smart Feedback Sorter | `FLAG{smart_sorter_85_percent_acc}` | Needs ANTHROPIC_API_KEY env var |
+| 8 | AI Menu Assistant | `FLAG{ai_menu_assistant_8_of_10}` | Uses `ctf_helper.ask_llm()` proxy |
+| 9 | Smart Feedback Sorter | `FLAG{smart_sorter_85_percent_acc}` | Uses `ctf_helper.ask_llm()` proxy |
 | 10 | Context is King | `FLAG{context_is_king_l0yalty_p0ints}` | Must modify 6 files in the restaurant system |
 | 11 | Prompt Craftsman | `FLAG{prompt_craftsman_5_for_5}` | Save outputs to `outputs/output1.md` through `output5.md` |
 | 12 | Full Stack Sprint | `FLAG{full_stack_sprint_st0re_l0cat0r}` | Build from scratch - most ambitious challenge |
 
-## Sharing the Claude API Key
+## LLM Proxy for Challenges 8, 9 & 16
 
-For challenges 8 and 9, participants need a Claude API key:
+These challenges use the server's built-in Claude Haiku proxy — **no API key sharing needed**.
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-api03-XXXXXXXXX
-```
+Participants call `ctf_helper.ask_llm()` which routes through the server at `/api/llm/chat`. The server's `ANTHROPIC_API_KEY` is used server-side and never exposed to participants.
 
-**Tip:** Project this on screen or share via a private Slack channel. Set a spend limit on the key beforehand.
+**Tip:** Rate limiting is built in (one request per 2 seconds per participant). Monitor usage in the server logs if needed.
 
 ## Manual Point Overrides
 
@@ -122,7 +120,7 @@ After awards, facilitate a structured discussion:
 | Cursor not generating code | Make sure Cursor has AI features enabled in settings |
 | Claude Code not working | Run `claude` in terminal to verify installation |
 | Challenge tests failing unexpectedly | Make sure they're in the right directory and deps are installed |
-| API key not working | Verify env var: `echo $ANTHROPIC_API_KEY` |
+| LLM proxy not working | Check server has `ANTHROPIC_API_KEY` set and `/api/llm/chat` returns 200 |
 
 ## Platform Admin URLs
 

@@ -1,5 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken } from "@/lib/crypto";
+
+const SECRET = process.env.CTF_TOKEN_SECRET || "ctf-default-secret-change-me";
+
+// Edge-compatible HMAC verification (no Node.js crypto)
+async function verifySessionTokenEdge(
+  token: string
+): Promise<{ participantId: string; eventId: string } | null> {
+  const parts = token.split(":");
+  if (parts.length !== 5 || parts[0] !== "SESSION") return null;
+
+  const [, participantId, eventId, timestampStr, providedHmac] = parts;
+  const payload = `${participantId}:${eventId}:${timestampStr}`;
+
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(`SESSION:${payload}`));
+  const expectedHmac = Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 16);
+
+  if (providedHmac !== expectedHmac) return null;
+
+  const timestamp = parseInt(timestampStr, 10);
+  if (isNaN(timestamp)) return null;
+
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+  if (Date.now() - timestamp > TWENTY_FOUR_HOURS) return null;
+
+  return { participantId, eventId };
+}
 
 /**
  * Middleware for:
@@ -8,7 +44,7 @@ import { verifySessionToken } from "@/lib/crypto";
  * 3. Restricting CORS on API routes to same-origin only
  * 4. Normalizing paths to prevent middleware bypass (e.g. /./challenges)
  */
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Normalize path to prevent bypass via /./challenges or //challenges
@@ -59,7 +95,7 @@ export function middleware(req: NextRequest) {
       req.cookies.get("ctf-session")?.value ??
       req.headers.get("authorization")?.replace("Bearer ", "");
 
-    if (!token || !verifySessionToken(token)) {
+    if (!token || !(await verifySessionTokenEdge(token))) {
       const url = req.nextUrl.clone();
       url.pathname = "/";
       return NextResponse.redirect(url);

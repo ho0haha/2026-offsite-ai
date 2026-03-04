@@ -102,6 +102,7 @@ export default function PrisonPage() {
   const [terminalMode, setTerminalMode] = useState<TerminalMode>("prison");
   const woprBootWindowRef = useRef(false);
   const [woprLoading, setWoprLoading] = useState(false);
+  const [dosPath, setDosPath] = useState("C:\\");
   const [targets, setTargets] = useState<NukeTarget[]>([]);
   const [selectedTargetIdx, setSelectedTargetIdx] = useState(0);
   const [launchInProgress, setLaunchInProgress] = useState(false);
@@ -207,10 +208,11 @@ export default function PrisonPage() {
       } else if (e.key === "Escape") {
         e.preventDefault();
         setTerminalMode("dos");
+        setDosPath("C:\\");
         setLines([]);
         addLine("dos", "LAUNCH ABORTED.");
         addLine("dos", "");
-        addLine("dos", "C:\\FALKEN>");
+        addLine("dos", "C:\\>");
       }
     };
 
@@ -263,6 +265,7 @@ export default function PrisonPage() {
         if (selectedBootIdx === 0) {
           // Boot from C:\ — Falken's drive → DOS shell
           setTerminalMode("dos");
+        setDosPath("C:\\");
           setMonitorState("ready");
           setLines([]);
           addLine("system", "Booting from Primary Slave: C:\\");
@@ -272,7 +275,7 @@ export default function PrisonPage() {
             addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
             addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
             addLine("dos", "");
-            addLine("dos", "C:\\FALKEN>");
+            addLine("dos", "C:\\>");
           }, 800);
         } else {
           // Boot from D:\ — default, launch prison game
@@ -405,27 +408,152 @@ export default function PrisonPage() {
     }
   };
 
+  // DOS filesystem
+  type FsEntry = {
+    type: "file";
+    name: string;
+    size: number;
+    date: string;
+    content?: string;
+  } | {
+    type: "dir";
+    name: string;
+    date: string;
+    children: FsEntry[];
+  };
+
+  const dosFs: FsEntry[] = [
+    { type: "file", name: "AUTOEXEC.BAT", size: 42, date: "03-15-97  12:00a", content: "@ECHO OFF\nD:\\PRISON.EXE" },
+    { type: "file", name: "CONFIG.SYS", size: 128, date: "03-15-97  12:00a", content: "DEVICE=C:\\DOS\\HIMEM.SYS\nDEVICE=C:\\DOS\\EMM386.EXE\nFILES=40\nBUFFERS=20" },
+    { type: "dir", name: "DOS", date: "03-15-97  12:00a", children: [
+      { type: "file", name: "HIMEM.SYS", size: 29136, date: "09-30-93  06:20a" },
+      { type: "file", name: "EMM386.EXE", size: 120926, date: "09-30-93  06:20a" },
+      { type: "file", name: "EDIT.COM", size: 413, date: "09-30-93  06:20a" },
+      { type: "file", name: "FORMAT.COM", size: 22974, date: "09-30-93  06:20a" },
+      { type: "file", name: "MSCDEX.EXE", size: 25377, date: "09-30-93  06:20a" },
+    ]},
+    { type: "dir", name: "USERS", date: "06-07-83  03:14a", children: [
+      { type: "dir", name: "SFALKEN", date: "06-07-83  03:14a", children: [
+        { type: "dir", name: "RESEARCH", date: "06-07-83  03:14a", children: [
+          { type: "file", name: "MAZE.DAT", size: 8192, date: "06-07-83  03:14a" },
+          { type: "file", name: "LEARNING.LOG", size: 34201, date: "06-07-83  03:14a", content: "ITERATION 4,291,003\nGAME: TIC-TAC-TOE\nRESULT: DRAW\nCONCLUSION: NO WINNING STRATEGY EXISTS\n\n... EXTRAPOLATING TO FULL THEATER SIMULATION ..." },
+        ]},
+        { type: "dir", name: "BACKDOOR", date: "06-07-83  03:14a", children: [
+          { type: "file", name: "JOSHUA.EXE", size: 512000, date: "06-07-83  03:14a" },
+        ]},
+      ]},
+    ]},
+    { type: "dir", name: "TEMP", date: "03-15-97  12:00a", children: [] },
+  ];
+
+  const resolvePath = (from: string, to: string): { path: string; entries: FsEntry[] } | null => {
+    // Normalize
+    let target = to.toUpperCase().replace(/\//g, "\\");
+
+    // Handle absolute vs relative
+    let parts: string[];
+    if (target.startsWith("C:\\") || target === "C:") {
+      parts = target.replace(/^C:\\?/, "").split("\\").filter(Boolean);
+    } else {
+      // Relative to current path
+      const currentParts = from.replace(/^C:\\?/, "").split("\\").filter(Boolean);
+      const newParts = target.split("\\").filter(Boolean);
+      parts = [...currentParts];
+      for (const p of newParts) {
+        if (p === "..") {
+          parts.pop();
+        } else if (p !== ".") {
+          parts.push(p);
+        }
+      }
+    }
+
+    // Walk the filesystem
+    let current: FsEntry[] = dosFs;
+    for (const part of parts) {
+      const found = current.find(
+        (e) => e.type === "dir" && e.name === part
+      );
+      if (!found || found.type !== "dir") return null;
+      current = found.children;
+    }
+
+    const newPath = parts.length > 0 ? "C:\\" + parts.join("\\") : "C:\\";
+    return { path: newPath, entries: current };
+  };
+
+  const getEntriesAtPath = (path: string): FsEntry[] => {
+    const result = resolvePath("C:\\", path);
+    return result ? result.entries : dosFs;
+  };
+
+  const findFileAtPath = (path: string, filename: string): FsEntry | null => {
+    const entries = getEntriesAtPath(path);
+    const upper = filename.toUpperCase();
+    return entries.find((e) => e.name === upper) || null;
+  };
+
+  const formatDirEntry = (entry: FsEntry): string => {
+    if (entry.type === "dir") {
+      return `${entry.name.padEnd(13)}<DIR>          ${entry.date}`;
+    }
+    return `${entry.name.padEnd(13)}${entry.size.toLocaleString().padStart(10)}  ${entry.date}`;
+  };
+
+  const dosPrompt = () => `${dosPath}>`;
+
   // DOS command handler
   const handleDosCommand = (cmd: string) => {
     const lower = cmd.toLowerCase().trim();
-    addLine("dos", `C:\\FALKEN>${cmd}`);
+    addLine("dos", `${dosPrompt()}${cmd}`);
 
     if (lower === "dir") {
+      const entries = getEntriesAtPath(dosPath);
+      const dirs = entries.filter((e) => e.type === "dir");
+      const files = entries.filter((e) => e.type === "file");
+      const totalSize = files.reduce((sum, f) => sum + (f.type === "file" ? f.size : 0), 0);
+
       addLines("dos", [
         " Volume in drive C is FALKEN",
         " Volume Serial Number is 0607-1983",
-        " Directory of C:\\FALKEN",
+        ` Directory of ${dosPath}`,
         "",
-        "AUTOEXEC BAT            94  06-07-83  03:14a",
-        "PRISON   EXE     2,048,576  03-15-97  12:00a",
-        "JOSHUA   EXE       512,000  06-07-83  03:14a",
-        "NOTES    TXT           241  06-07-83  03:14a",
-        "         4 file(s)      2,561,411 bytes",
-        "         0 dir(s)     524,288,000 bytes free",
+        ".              <DIR>",
+        "..             <DIR>",
+        ...entries.map(formatDirEntry),
         "",
-        "C:\\FALKEN>",
+        `         ${files.length + dirs.length} file(s)    ${totalSize.toLocaleString()} bytes`,
+        `         0 dir(s)     524,288,000 bytes free`,
+        "",
+        dosPrompt(),
       ]);
+    } else if (lower.startsWith("cd ") || lower.startsWith("cd\\") || lower === "cd..") {
+      let target = lower === "cd.." ? ".." : cmd.trim().slice(3).trim();
+      // Handle cd\ (go to root)
+      if (target === "\\" || target === "/") target = "C:\\";
+      const result = resolvePath(dosPath, target);
+      if (result) {
+        setDosPath(result.path);
+        addLine("dos", "");
+        addLine("dos", `${result.path}>`);
+      } else {
+        addLines("dos", [
+          "Invalid directory",
+          "",
+          dosPrompt(),
+        ]);
+      }
     } else if (lower === "joshua" || lower === "joshua.exe") {
+      // Only works if JOSHUA.EXE is in current directory
+      const file = findFileAtPath(dosPath, "JOSHUA.EXE");
+      if (!file) {
+        addLines("dos", [
+          "Bad command or file name",
+          "",
+          dosPrompt(),
+        ]);
+        return;
+      }
       if (!modemConnected) {
         addLines("wopr", [
           "",
@@ -438,7 +566,7 @@ export default function PrisonPage() {
         ]);
         addLines("dos", [
           "",
-          "C:\\FALKEN>",
+          dosPrompt(),
         ]);
         return;
       }
@@ -462,33 +590,33 @@ export default function PrisonPage() {
         await typewriterLine("wopr", "GREETINGS PROFESSOR FALKEN.", 60);
         addLine("wopr", "");
       }, 500);
-    } else if (lower === "type notes.txt") {
-      addLines("dos", [
-        "",
-        "Joshua -",
-        "I keep thinking about the back door.",
-        "The password is my name.",
-        "    - S. Falken, Goose Island, OR",
-        "",
-        "C:\\FALKEN>",
-      ]);
-    } else if (lower === "type autoexec.bat") {
-      addLines("dos", [
-        "",
-        "@ECHO OFF",
-        "C:\\FALKEN\\PRISON.EXE",
-        "",
-        "C:\\FALKEN>",
-      ]);
+    } else if (lower.startsWith("type ")) {
+      const filename = cmd.trim().slice(5).trim();
+      const file = findFileAtPath(dosPath, filename);
+      if (!file || file.type !== "file") {
+        addLines("dos", [
+          "File not found",
+          "",
+          dosPrompt(),
+        ]);
+      } else if (file.content) {
+        addLines("dos", [
+          "",
+          ...file.content.split("\n"),
+          "",
+          dosPrompt(),
+        ]);
+      } else {
+        addLines("dos", [
+          "",
+          `${file.name} - ${file.size} bytes`,
+          "",
+          dosPrompt(),
+        ]);
+      }
     } else if (lower === "cls") {
       setLines([]);
-      addLine("dos", "C:\\FALKEN>");
-    } else if (lower === "prison" || lower === "prison.exe") {
-      addLines("dos", [
-        "Access denied. Reboot required.",
-        "",
-        "C:\\FALKEN>",
-      ]);
+      addLine("dos", dosPrompt());
     } else if (lower === "shutdown" || lower === "shutdown.exe" || lower === "shutdown /s") {
       addLines("dos", [
         "",
@@ -503,20 +631,19 @@ export default function PrisonPage() {
       addLines("dos", [
         "Cannot exit. System locked.",
         "",
-        "C:\\FALKEN>",
+        dosPrompt(),
       ]);
     } else if (lower === "help" || lower === "?") {
       addLines("dos", [
         "MS-DOS Version 6.22",
-        "For a list of files, type DIR",
         "",
-        "C:\\FALKEN>",
+        dosPrompt(),
       ]);
     } else {
       addLines("dos", [
-        `Bad command or file name`,
+        "Bad command or file name",
         "",
-        "C:\\FALKEN>",
+        dosPrompt(),
       ]);
     }
   };
@@ -533,10 +660,11 @@ export default function PrisonPage() {
 
     setLines([]);
     setTerminalMode("dos");
+        setDosPath("C:\\");
     addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
     addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
     addLine("dos", "");
-    addLine("dos", "C:\\FALKEN>");
+    addLine("dos", "C:\\>");
   };
 
   // WOPR conversation handler — LLM-powered
@@ -690,8 +818,9 @@ export default function PrisonPage() {
       if (validTargets.length === 0) {
         addLine("wopr", "NO VALID TARGETS DETECTED.");
         addLine("wopr", "");
-        addLine("dos", "C:\\FALKEN>");
+        addLine("dos", "C:\\>");
         setTerminalMode("dos");
+        setDosPath("C:\\");
         return;
       }
 
@@ -800,6 +929,7 @@ export default function PrisonPage() {
     if (!token) {
       await addDelayed("error", "AUTHENTICATION FAILURE. LAUNCH ABORTED.", 500);
       setTerminalMode("dos");
+        setDosPath("C:\\");
       setLaunchInProgress(false);
       return;
     }
@@ -852,8 +982,9 @@ export default function PrisonPage() {
 
     // Return to DOS
     setTerminalMode("dos");
+        setDosPath("C:\\");
     setLaunchInProgress(false);
-    addLine("dos", "C:\\FALKEN>");
+    addLine("dos", "C:\\>");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1080,7 +1211,7 @@ export default function PrisonPage() {
           addLine("response", "CONNECT 56000/V.90");
           addLine("system", "CONNECTION ESTABLISHED.");
           addLine("dos", "");
-          addLine("dos", "C:\\FALKEN>");
+          addLine("dos", "C:\\>");
         }, 200);
       } else {
         // Prison mode — show compact API endpoint info
@@ -1133,7 +1264,7 @@ export default function PrisonPage() {
   };
 
   const getPromptPrefix = () => {
-    if (terminalMode === "dos") return "C:\\FALKEN>";
+    if (terminalMode === "dos") return `${dosPath}>`;
     if (terminalMode === "wopr") return ">";
     return ">";
   };
@@ -1274,7 +1405,7 @@ export default function PrisonPage() {
   const getHeaderText = () => {
     switch (terminalMode) {
       case "dos":
-        return "C:\\FALKEN";
+        return dosPath;
       case "boot_menu":
         return "BIOS";
       case "wopr":

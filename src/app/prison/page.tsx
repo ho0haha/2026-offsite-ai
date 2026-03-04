@@ -455,6 +455,16 @@ export default function PrisonPage() {
         "",
         "C:\\FALKEN>",
       ]);
+    } else if (lower === "shutdown" || lower === "shutdown.exe" || lower === "shutdown /s") {
+      addLines("dos", [
+        "",
+        "System is shutting down...",
+      ]);
+      setTimeout(() => {
+        setLines([]);
+        setTerminalMode("prison");
+        setMonitorState("off");
+      }, 2000);
     } else if (lower === "exit" || lower === "quit") {
       addLines("dos", [
         "Cannot exit. System locked.",

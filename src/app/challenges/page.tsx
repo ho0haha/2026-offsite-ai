@@ -308,10 +308,30 @@ export default function ChallengesPage() {
     }
     if (res.ok) {
       const data = await res.json();
+      // Detect tier-up from polling (external submissions)
+      const newMaxTier = data.progress?.currentMaxTier;
+      if (
+        prevTierRef.current !== null &&
+        newMaxTier > prevTierRef.current &&
+        !rankUpData // don't overwrite an active rank-up animation
+      ) {
+        // Gather newly unlocked challenges from the new tiers
+        const newlyUnlocked: { tier: number; title: string; id: string }[] = [];
+        for (const tierGroup of data.tiers) {
+          if (tierGroup.tier > prevTierRef.current && tierGroup.tier <= newMaxTier) {
+            for (const ch of tierGroup.challenges) {
+              newlyUnlocked.push({ tier: tierGroup.tier, title: ch.title, id: ch.id });
+            }
+          }
+        }
+        if (newlyUnlocked.length > 0) {
+          setRankUpData({ newTier: newMaxTier, challenges: newlyUnlocked });
+        }
+      }
       setTiers(data.tiers);
       setProgress(data.progress);
     }
-  }, [router]);
+  }, [router, rankUpData]);
 
   useEffect(() => {
     const stored = localStorage.getItem("ctf-participant");
@@ -327,6 +347,13 @@ export default function ChallengesPage() {
     if (participant) {
       fetchChallenges();
     }
+  }, [participant, fetchChallenges]);
+
+  // Poll for challenge state updates and tier transitions (e.g. from external agent submissions)
+  useEffect(() => {
+    if (!participant) return;
+    const interval = setInterval(fetchChallenges, 5000);
+    return () => clearInterval(interval);
   }, [participant, fetchChallenges]);
 
   async function handleSubmit(challengeId: string) {

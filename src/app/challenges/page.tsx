@@ -613,7 +613,7 @@ export default function ChallengesPage() {
                           </span>
                         ) : (
                           <span className="font-mono text-xs text-muted-foreground/50 shrink-0">
-                            #{String(chIdx + 1).padStart(2, "0")}
+                            #{String(ch.sortOrder).padStart(2, "0")}
                           </span>
                         )}
                         <span className={ch.solved ? "text-green-300/80" : ""}>

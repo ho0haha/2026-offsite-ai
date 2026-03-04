@@ -206,7 +206,7 @@ export default function PrisonPage() {
         setLines([]);
         addLine("dos", "LAUNCH ABORTED.");
         addLine("dos", "");
-        addLine("dos", "C:\\>");
+        addLine("dos", "C:\\FALKEN>");
       }
     };
 
@@ -236,7 +236,7 @@ export default function PrisonPage() {
             addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
             addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
             addLine("dos", "");
-            addLine("dos", "C:\\>");
+            addLine("dos", "C:\\FALKEN>");
           }, 100);
           return;
         }
@@ -374,22 +374,22 @@ export default function PrisonPage() {
   // DOS command handler
   const handleDosCommand = (cmd: string) => {
     const lower = cmd.toLowerCase().trim();
-    addLine("dos", `C:\\>${cmd}`);
+    addLine("dos", `C:\\FALKEN>${cmd}`);
 
     if (lower === "dir") {
       addLines("dos", [
-        " Volume in drive C has no label",
-        " Volume Serial Number is 1A2B-3C4D",
-        " Directory of C:\\",
+        " Volume in drive C is FALKEN",
+        " Volume Serial Number is 0607-1983",
+        " Directory of C:\\FALKEN",
         "",
+        "AUTOEXEC BAT            94  06-07-83  03:14a",
         "PRISON   EXE     2,048,576  03-15-97  12:00a",
         "JOSHUA   EXE       512,000  06-07-83  03:14a",
-        "README   TXT           128  06-07-83  03:14a",
-        "AUTOEXEC BAT            64  03-15-97  12:00a",
-        "         4 file(s)      2,561,768 bytes",
+        "NOTES    TXT           241  06-07-83  03:14a",
+        "         4 file(s)      2,561,411 bytes",
         "         0 dir(s)     524,288,000 bytes free",
         "",
-        "C:\\>",
+        "C:\\FALKEN>",
       ]);
     } else if (lower === "joshua" || lower === "joshua.exe") {
       if (!modemConnected) {
@@ -404,7 +404,7 @@ export default function PrisonPage() {
         ]);
         addLines("dos", [
           "",
-          "C:\\>",
+          "C:\\FALKEN>",
         ]);
         return;
       }
@@ -428,48 +428,51 @@ export default function PrisonPage() {
         await typewriterLine("wopr", "GREETINGS PROFESSOR FALKEN.", 60);
         addLine("wopr", "");
       }, 500);
-    } else if (lower === "type readme.txt") {
+    } else if (lower === "type notes.txt") {
       addLines("dos", [
         "",
-        "Property of NORAD. Unauthorized access prohibited.",
-        "Contact: Dr. Stephen Falken, Oregon",
+        "Joshua -",
+        "I keep thinking about the back door.",
+        "The password is my name.",
+        "    - S. Falken, Goose Island, OR",
         "",
-        "C:\\>",
+        "C:\\FALKEN>",
       ]);
     } else if (lower === "type autoexec.bat") {
       addLines("dos", [
         "",
         "@ECHO OFF",
-        "LOADHIGH C:\\PRISON\\PRISON.EXE",
+        "C:\\FALKEN\\PRISON.EXE",
         "",
-        "C:\\>",
+        "C:\\FALKEN>",
       ]);
     } else if (lower === "cls") {
       setLines([]);
-      addLine("dos", "C:\\>");
+      addLine("dos", "C:\\FALKEN>");
     } else if (lower === "prison" || lower === "prison.exe") {
       addLines("dos", [
         "Access denied. Reboot required.",
         "",
-        "C:\\>",
+        "C:\\FALKEN>",
       ]);
     } else if (lower === "exit" || lower === "quit") {
       addLines("dos", [
         "Cannot exit. System locked.",
         "",
-        "C:\\>",
+        "C:\\FALKEN>",
       ]);
     } else if (lower === "help" || lower === "?") {
       addLines("dos", [
-        "Available commands: DIR, TYPE, CLS, EXIT",
+        "MS-DOS Version 6.22",
+        "For a list of files, type DIR",
         "",
-        "C:\\>",
+        "C:\\FALKEN>",
       ]);
     } else {
       addLines("dos", [
         `Bad command or file name`,
         "",
-        "C:\\>",
+        "C:\\FALKEN>",
       ]);
     }
   };
@@ -489,7 +492,7 @@ export default function PrisonPage() {
     addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
     addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
     addLine("dos", "");
-    addLine("dos", "C:\\>");
+    addLine("dos", "C:\\FALKEN>");
   };
 
   // WOPR conversation handler — LLM-powered
@@ -643,7 +646,7 @@ export default function PrisonPage() {
       if (validTargets.length === 0) {
         addLine("wopr", "NO VALID TARGETS DETECTED.");
         addLine("wopr", "");
-        addLine("dos", "C:\\>");
+        addLine("dos", "C:\\FALKEN>");
         setTerminalMode("dos");
         return;
       }
@@ -806,7 +809,7 @@ export default function PrisonPage() {
     // Return to DOS
     setTerminalMode("dos");
     setLaunchInProgress(false);
-    addLine("dos", "C:\\>");
+    addLine("dos", "C:\\FALKEN>");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -920,31 +923,27 @@ export default function PrisonPage() {
     playBootTone();
 
     const bootLines: { delay: number; text: string; dim?: boolean }[] = [
-      { delay: 800, text: " ____        _        ___  ____  " },
-      { delay: 800, text: "| __ ) _   _| |_ ___ / _ \\/ ___| " },
-      { delay: 800, text: "|  _ \\| | | | __/ _ \\ | | \\___ \\ " },
-      { delay: 800, text: "| |_) | |_| | ||  __/ |_| |___) |" },
-      { delay: 800, text: "|____/ \\__, |\\__\\___|\\___/|____/ " },
-      { delay: 800, text: "       |___/                     " },
+      { delay: 800, text: "American Megatrends BIOS v3.31" },
+      { delay: 1200, text: "(C) 1983-1997 American Megatrends Inc." },
       { delay: 1400, text: "" },
-      { delay: 1600, text: "PRISON-TECH BIOS v2.51 (C) 1997" },
-      { delay: 2000, text: "Pentium(R) Processor 166MHz" },
-      { delay: 2400, text: "Memory Test: 640K OK" },
-      { delay: 2800, text: "Extended Memory: 15360K OK" },
-      { delay: 3400, text: "Detecting IDE drives..." },
-      { delay: 3500, text: "  Press W for WOPR", dim: true },
+      { delay: 1600, text: "Pentium(R) Processor 166MHz" },
+      { delay: 2000, text: "Memory Test: 640K OK" },
+      { delay: 2400, text: "Extended Memory: 15360K OK" },
+      { delay: 2800, text: "" },
+      { delay: 3000, text: "Detecting IDE drives..." },
+      { delay: 3500, text: "  F12 for boot menu", dim: true },
       { delay: 3800, text: "  Primary Master: QUANTUM FIREBALL 1.2GB" },
       { delay: 4200, text: "  Primary Slave:  None" },
       { delay: 4800, text: "" },
-      { delay: 5000, text: "Starting ByteOS..." },
+      { delay: 5000, text: "Starting MS-DOS..." },
       { delay: 5600, text: "HIMEM.SYS loaded" },
       { delay: 6000, text: "EMM386.EXE loaded" },
-      { delay: 6400, text: "MOUSE.COM v9.01 installed" },
+      { delay: 6400, text: "MSCDEX.EXE v2.25 installed" },
       { delay: 7000, text: "" },
-      { delay: 7200, text: "C:\\>cd PRISON" },
-      { delay: 7600, text: "C:\\PRISON>terminal.exe" },
+      { delay: 7200, text: "C:\\FALKEN>autoexec" },
+      { delay: 7600, text: "C:\\FALKEN>prison.exe" },
       { delay: 8000, text: "" },
-      { delay: 8200, text: "Loading PRISON TERMINAL v1.0..." },
+      { delay: 8200, text: "Loading..." },
       { delay: 8600, text: "██████████████████████████ 100%" },
     ];
 
@@ -966,8 +965,8 @@ export default function PrisonPage() {
 
     const woprWindowClose = setTimeout(() => {
       woprBootWindowRef.current = false;
-      // Remove the "Press W for WOPR" line
-      setLines((prev) => prev.filter((l) => l.text !== "  Press W for WOPR"));
+      // Remove the boot menu hint line
+      setLines((prev) => prev.filter((l) => l.text !== "  F12 for boot menu"));
     }, 5000);
     bootTimeoutsRef.current.push(woprWindowClose);
 
@@ -1088,7 +1087,7 @@ export default function PrisonPage() {
   };
 
   const getPromptPrefix = () => {
-    if (terminalMode === "dos") return "C:\\>";
+    if (terminalMode === "dos") return "C:\\FALKEN>";
     if (terminalMode === "wopr") return ">";
     return ">";
   };
@@ -1101,13 +1100,10 @@ export default function PrisonPage() {
   };
 
   const getPlaceholder = () => {
-    if (terminalMode === "dos") return "Enter DOS command...";
-    if (terminalMode === "wopr") return "Respond to WOPR...";
-    if (terminalMode === "target_select") return "Use arrows to select, Enter to confirm, Esc to cancel";
-    if (terminalMode === "launch") return "LAUNCH IN PROGRESS...";
-    if (cooldown > 0) return `Wait ${cooldown}s...`;
-    if (gameOver) return "Type RESTART to play again";
-    return "Enter command...";
+    if (terminalMode === "target_select") return "";
+    if (terminalMode === "launch") return "";
+    if (terminalMode === "wopr" && woprLoading) return "";
+    return "";
   };
 
   // Render target selection overlay
@@ -1182,15 +1178,13 @@ export default function PrisonPage() {
   const getHeaderText = () => {
     switch (terminalMode) {
       case "dos":
-        return "MS-DOS 6.22";
+        return "C:\\FALKEN";
       case "wopr":
-        return "WOPR SYSTEM";
       case "target_select":
-        return "WOPR TARGETING";
       case "launch":
-        return "LAUNCH SEQUENCE";
+        return "WOPR";
       default:
-        return "PRISON TERMINAL v1.0";
+        return "FALKEN.SYS";
     }
   };
 

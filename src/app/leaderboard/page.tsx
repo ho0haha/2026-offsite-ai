@@ -46,7 +46,9 @@ function LeaderboardContent() {
 
   const fetchLeaderboard = useCallback(async (eventId: string) => {
     try {
-      const res = await fetch(`/api/leaderboard?eventId=${eventId}`);
+      const token = typeof window !== "undefined" ? localStorage.getItem("ctf-token") : null;
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`/api/leaderboard?eventId=${eventId}`, { headers });
       if (!res.ok) throw new Error("fetch failed");
       const data = await res.json();
 

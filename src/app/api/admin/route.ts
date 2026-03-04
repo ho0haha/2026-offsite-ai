@@ -8,12 +8,25 @@ import {
 } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 function checkAuth(req: NextRequest) {
   const secret = process.env.ADMIN_SECRET;
   if (!secret) {
     return NextResponse.json({ error: "Admin not configured" }, { status: 500 });
   }
+
+  // Rate limit admin auth attempts by IP
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = checkRateLimit(`admin:${ip}`, 5, 300_000); // 5 attempts per 5 minutes
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts. Try again later." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
+    );
+  }
+
   const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

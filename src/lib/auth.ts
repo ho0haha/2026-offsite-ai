@@ -14,7 +14,7 @@ export function requireAuth(
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return NextResponse.json(
-      { error: "Authentication required" },
+      { error: "Unauthorized" },
       { status: 401 }
     );
   }
@@ -23,7 +23,7 @@ export function requireAuth(
   const session = verifySessionToken(token);
   if (!session) {
     return NextResponse.json(
-      { error: "Invalid or expired session token" },
+      { error: "Unauthorized" },
       { status: 401 }
     );
   }

@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { participants, events, submissions, challenges } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const eventId = req.nextUrl.searchParams.get("eventId");
+  // Require a valid session token
+  const auth = requireAuth(req);
+  if (auth instanceof NextResponse) return auth;
+
+  const eventId = req.nextUrl.searchParams.get("eventId") ?? auth.eventId;
 
   if (!eventId) {
     return NextResponse.json({ error: "eventId is required" }, { status: 400 });

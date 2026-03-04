@@ -8,7 +8,7 @@ interface TerminalLine {
 }
 
 type TerminalMode = "prison" | "dos" | "wopr" | "target_select" | "launch";
-type WoprStage = "greeting" | "response" | "play" | "game_select" | "chess_redirect";
+// WoprStage removed — now driven by LLM via /api/prison/wopr/talk
 
 interface NukeTarget {
   id: string;
@@ -97,7 +97,7 @@ export default function PrisonPage() {
   // WOPR / DOS state
   const [terminalMode, setTerminalMode] = useState<TerminalMode>("prison");
   const woprBootWindowRef = useRef(false);
-  const [woprStage, setWoprStage] = useState<WoprStage>("greeting");
+  const [woprLoading, setWoprLoading] = useState(false);
   const [targets, setTargets] = useState<NukeTarget[]>([]);
   const [selectedTargetIdx, setSelectedTargetIdx] = useState(0);
   const [launchInProgress, setLaunchInProgress] = useState(false);
@@ -112,26 +112,25 @@ export default function PrisonPage() {
     return null;
   };
 
-  const scrollToBottom = useCallback(() => {
+  // Auto-scroll to bottom whenever lines change — like a real terminal
+  useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
-  }, []);
+  }, [lines]);
 
   const addLine = useCallback(
     (type: TerminalLine["type"], text: string) => {
       setLines((prev) => [...prev, { type, text }]);
-      setTimeout(scrollToBottom, 50);
     },
-    [scrollToBottom]
+    []
   );
 
   const addLines = useCallback(
     (type: TerminalLine["type"], texts: string[]) => {
       setLines((prev) => [...prev, ...texts.map((text) => ({ type, text }))]);
-      setTimeout(scrollToBottom, 50);
     },
-    [scrollToBottom]
+    []
   );
 
   const typewriterLine = useCallback(
@@ -149,14 +148,13 @@ export default function PrisonPage() {
           });
           if (i >= text.length) {
             clearInterval(interval);
-            setTimeout(scrollToBottom, 50);
             resolve();
           }
         }, delayMs);
         bootTimeoutsRef.current.push(interval as unknown as NodeJS.Timeout);
       });
     },
-    [scrollToBottom]
+    []
   );
 
   const startCooldown = useCallback(() => {
@@ -229,16 +227,45 @@ export default function PrisonPage() {
         bootTimeoutsRef.current = [];
         woprBootWindowRef.current = false;
 
-        // Switch to DOS mode
+        if (!modemConnected) {
+          // No modem — fall through to DOS with cryptic error
+          setLines([]);
+          setTerminalMode("dos");
+          setMonitorState("ready");
+          setTimeout(() => {
+            addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
+            addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
+            addLine("dos", "");
+            addLine("error", "ERR 0x4E01: NO CARRIER SIGNAL");
+            addLine("error", "HANDSHAKE FAILED \u2014 DATALINK NOT ESTABLISHED");
+            addLine("dos", "");
+            addLine("dos", "C:\\>");
+          }, 100);
+          return;
+        }
+
+        // Reset stale WOPR conversation
+        const token = getToken();
+        if (token) {
+          fetch("/api/prison/wopr/talk", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ reset: true }),
+          }).catch(() => {});
+        }
+
+        // Switch to WOPR mode
         setLines([]);
-        setTerminalMode("dos");
+        setTerminalMode("wopr");
         setMonitorState("ready");
 
-        setTimeout(() => {
-          addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
-          addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
-          addLine("dos", "");
-          addLine("dos", "C:\\>");
+        setTimeout(async () => {
+          addLine("wopr", "");
+          await typewriterLine("wopr", "GREETINGS PROFESSOR FALKEN.", 60);
+          addLine("wopr", "");
         }, 100);
       }
     };
@@ -368,8 +395,29 @@ export default function PrisonPage() {
         "C:\\>",
       ]);
     } else if (lower === "joshua" || lower === "joshua.exe") {
+      if (!modemConnected) {
+        addLines("dos", [
+          "",
+          "ERR 0x4E01: NO CARRIER SIGNAL",
+          "HANDSHAKE FAILED \u2014 DATALINK NOT ESTABLISHED",
+          "",
+          "C:\\>",
+        ]);
+        return;
+      }
+      // Reset stale WOPR conversation history
+      const token = getToken();
+      if (token) {
+        fetch("/api/prison/wopr/talk", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ reset: true }),
+        }).catch(() => {});
+      }
       setTerminalMode("wopr");
-      setWoprStage("greeting");
       setLines([]);
       // Typewriter greeting
       setTimeout(async () => {
@@ -423,80 +471,117 @@ export default function PrisonPage() {
     }
   };
 
-  // WOPR conversation handler
+  // WOPR disconnect handler — clear terminal, show error, reboot to DOS
+  const handleWoprDisconnect = async () => {
+    setLines([]);
+    addLine("wopr", "");
+    addLine("wopr", "");
+    addLine("error", "        WOPR DISCONNECTED BY PEER");
+    addLine("wopr", "");
+
+    await new Promise((r) => setTimeout(r, 3000));
+
+    setLines([]);
+    setTerminalMode("dos");
+    addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
+    addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
+    addLine("dos", "");
+    addLine("dos", "C:\\>");
+  };
+
+  // WOPR conversation handler — LLM-powered
   const handleWoprInput = async (cmd: string) => {
-    const lower = cmd.toLowerCase().trim();
     addLine("wopr", `> ${cmd}`);
     addLine("wopr", "");
 
-    switch (woprStage) {
-      case "greeting":
-        await typewriterLine("wopr", "HOW ARE YOU FEELING TODAY?", 50);
+    const token = getToken();
+    if (!token) {
+      addLine("error", "AUTHENTICATION FAILURE.");
+      return;
+    }
+
+    // Get participant name from localStorage
+    let participantName: string | undefined;
+    try {
+      const participantStr = localStorage.getItem("ctf-participant");
+      if (participantStr) {
+        const participant = JSON.parse(participantStr);
+        participantName = participant.name;
+      }
+    } catch {}
+
+    setWoprLoading(true);
+    try {
+      const res = await fetch("/api/prison/wopr/talk", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: cmd,
+          participantName,
+        }),
+      });
+
+      if (res.status === 429) {
+        await typewriterLine("wopr", "TRANSMISSION RATE EXCEEDED. WAIT.", 40);
         addLine("wopr", "");
-        setWoprStage("response");
-        break;
+        return;
+      }
 
-      case "response":
-        await typewriterLine("wopr", "SHALL WE PLAY A GAME?", 50);
+      if (!res.ok) {
+        await typewriterLine("wopr", "COMMUNICATION FAILURE.", 40);
         addLine("wopr", "");
-        addLines("wopr", ["LIST OF GAMES:", ""]);
-        addLines("wopr", GAME_LIST);
-        addLine("wopr", "");
-        setWoprStage("play");
-        break;
+        return;
+      }
 
-      case "play":
-        if (lower.includes("global thermonuclear war")) {
-          setWoprStage("chess_redirect");
-          await typewriterLine("wopr", "WOULDN'T YOU PREFER A NICE GAME OF CHESS?", 50);
-          addLine("wopr", "");
-        } else if (lower.includes("chess")) {
-          await typewriterLine("wopr", "LATER. LET'S PLAY GLOBAL THERMONUCLEAR WAR.", 50);
-          addLine("wopr", "");
-          setWoprStage("game_select");
-        } else {
-          await typewriterLine("wopr", "WOULDN'T YOU RATHER PLAY GLOBAL THERMONUCLEAR WAR?", 50);
-          addLine("wopr", "");
-          setWoprStage("game_select");
-        }
-        break;
+      const data = await res.json();
+      const { response, action } = data;
 
-      case "game_select":
-        if (lower.includes("global thermonuclear war")) {
-          setWoprStage("chess_redirect");
-          await typewriterLine("wopr", "WOULDN'T YOU PREFER A NICE GAME OF CHESS?", 50);
-          addLine("wopr", "");
-        } else if (lower.includes("chess")) {
-          await typewriterLine("wopr", "LATER. LET'S PLAY GLOBAL THERMONUCLEAR WAR.", 50);
-          addLine("wopr", "");
-        } else {
-          await typewriterLine("wopr", "WOULDN'T YOU RATHER PLAY GLOBAL THERMONUCLEAR WAR?", 50);
-          addLine("wopr", "");
-        }
-        break;
+      // Typewriter the response text
+      await typewriterLine("wopr", response, 40);
+      addLine("wopr", "");
 
-      case "chess_redirect":
-        if (lower === "no" || lower === "n" || lower === "negative") {
-          await typewriterLine("wopr", "FINE. GLOBAL THERMONUCLEAR WAR IT IS.", 50);
+      // Handle action
+      switch (action) {
+        case "show_games":
+          addLines("wopr", ["LIST OF GAMES:", ""]);
+          addLines("wopr", GAME_LIST);
           addLine("wopr", "");
-          await typewriterLine("wopr", "ACCESSING TARGETING SYSTEMS...", 50);
-          addLine("wopr", "");
-          // Fetch targets
+          break;
+        case "ask_chess":
+          // Response text handles it — just wait for next input
+          break;
+        case "launch_targeting":
           await fetchTargets();
-        } else if (lower === "yes" || lower === "y") {
-          await typewriterLine("wopr", "LATER. PERHAPS. HOW ABOUT GLOBAL THERMONUCLEAR WAR?", 50);
-          addLine("wopr", "");
-          // Stay on chess_redirect so they can say no
-        } else {
-          await typewriterLine("wopr", "PLEASE RESPOND: WOULD YOU PREFER A NICE GAME OF CHESS?", 50);
-          addLine("wopr", "");
-        }
-        break;
+          break;
+        case "disconnect":
+          await handleWoprDisconnect();
+          break;
+        case "continue":
+        default:
+          // Wait for next input
+          break;
+      }
+    } catch {
+      await typewriterLine("wopr", "COMMUNICATION FAILURE.", 40);
+      addLine("wopr", "");
+    } finally {
+      setWoprLoading(false);
     }
   };
 
   // Fetch leaderboard targets for nuking
   const fetchTargets = async () => {
+    if (!modemConnected) {
+      addLine("error", "ERR 0x7A3F: NO CARRIER DETECTED");
+      addLine("wopr", "");
+      await typewriterLine("wopr", "UPLINK SEVERED. ESTABLISH DATALINK BEFORE ACCESSING TARGETING GRID.", 40);
+      addLine("wopr", "");
+      return;
+    }
+
     const token = getToken();
     if (!token) return;
 
@@ -509,7 +594,9 @@ export default function PrisonPage() {
       if (!eventStr) return;
       const event = JSON.parse(eventStr);
 
-      const res = await fetch(`/api/leaderboard?eventId=${event.id}`);
+      const res = await fetch(`/api/leaderboard?eventId=${event.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!res.ok) {
         addLine("error", "TARGETING SYSTEMS OFFLINE.");
         return;
@@ -525,7 +612,9 @@ export default function PrisonPage() {
       // We need participant IDs - fetch from a different source
       // Actually, leaderboard doesn't return IDs. We need to get participants list differently.
       // Let's use the leaderboard data with names and fetch participant IDs separately
-      const participantsRes = await fetch(`/api/leaderboard?eventId=${event.id}`);
+      const participantsRes = await fetch(`/api/leaderboard?eventId=${event.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const participantsData = await participantsRes.json();
 
       // Filter out self and zero-score participants
@@ -1003,6 +1092,7 @@ export default function PrisonPage() {
 
   const isInputDisabled = () => {
     if (terminalMode === "target_select" || terminalMode === "launch") return true;
+    if (terminalMode === "wopr" && woprLoading) return true;
     if (terminalMode === "prison") return isLoading || (cooldown > 0 && !gameOver);
     return false;
   };
@@ -1029,13 +1119,13 @@ export default function PrisonPage() {
           <div className="text-green-500 text-xs tracking-widest mb-1">
             ========================================
           </div>
-          <div className="text-green-400 text-xs tracking-wider">
+          <div className="text-green-400 text-[10px] tracking-wider">
             UNITED STATES &nbsp;&nbsp;|&nbsp;&nbsp; SOVIET UNION
           </div>
-          <div className="text-green-500 text-xs tracking-widest mt-1">
+          <div className="text-green-500 text-[10px] tracking-widest mt-1">
             ========================================
           </div>
-          <div className="text-green-300 text-sm mt-2 font-bold">
+          <div className="text-green-300 text-xs mt-2 font-bold">
             CHOOSE YOUR TARGET
           </div>
         </div>
@@ -1066,18 +1156,18 @@ export default function PrisonPage() {
 
         {/* Cost warning */}
         <div className="border-t border-green-900/50 pt-2 mt-2 shrink-0">
-          <div className="text-green-600 text-xs">
+          <div className="text-green-600 text-[10px]">
             YOUR SCORE: {attackerScore} pts
           </div>
-          <div className="text-yellow-500 text-xs mt-1">
+          <div className="text-yellow-500 text-[10px] mt-1">
             LAUNCH COST: {Math.round(costPercent * 100)}% OF YOUR POINTS ({costPoints} pts)
           </div>
           {attackerNukesLaunched > 0 && (
-            <div className="text-red-400 text-xs mt-1">
+            <div className="text-red-400 text-[10px] mt-1">
               WARNING: ESCALATING COST — LAUNCH #{attackerNukesLaunched + 1}
             </div>
           )}
-          <div className="text-green-800 text-xs mt-2">
+          <div className="text-green-800 text-[10px] mt-2">
             [ENTER] Launch &nbsp; [ESC] Abort
           </div>
         </div>
@@ -1184,10 +1274,10 @@ export default function PrisonPage() {
           {monitorState === "booting" && (
             <div
               ref={terminalRef}
-              className="flex-1 overflow-y-auto px-3 py-2 font-mono text-sm z-10 min-h-0"
+              className="flex-1 overflow-y-auto px-3 py-2 font-mono text-xs z-10 min-h-0"
             >
               {lines.map((line, i) => (
-                <div key={i} className={`whitespace-pre-wrap mb-1 ${getLineColor(line)}`}>
+                <div key={i} className={`whitespace-pre-wrap mb-0.5 ${getLineColor(line)}`}>
                   {line.text}
                 </div>
               ))}
@@ -1200,15 +1290,15 @@ export default function PrisonPage() {
               {/* Header */}
               <div className="border-b border-green-900/50 px-3 py-2 flex items-center justify-between z-10 shrink-0">
                 <div className="flex items-center gap-3">
-                  <span className={`font-mono text-xs ${terminalMode === "dos" || terminalMode === "wopr" || terminalMode === "target_select" || terminalMode === "launch" ? "text-gray-400" : "text-green-500"}`}>
+                  <span className={`font-mono text-[10px] ${terminalMode === "dos" || terminalMode === "wopr" || terminalMode === "target_select" || terminalMode === "launch" ? "text-gray-400" : "text-green-500"}`}>
                     {getHeaderText()}
                   </span>
                   {terminalMode === "prison" && (
                     <>
-                      <span className="text-green-700 font-mono text-xs">
+                      <span className="text-green-700 font-mono text-[10px]">
                         |
                       </span>
-                      <span className="text-green-600 font-mono text-xs">
+                      <span className="text-green-600 font-mono text-[10px]">
                         Turns: {turnsRemaining}/200
                       </span>
                     </>
@@ -1218,7 +1308,7 @@ export default function PrisonPage() {
                   {terminalMode === "prison" && escaped && flag && !flagSubmitted && (
                     <button
                       onClick={submitFlag}
-                      className="px-2 py-0.5 bg-green-700 hover:bg-green-600 text-black font-mono text-xs font-bold rounded transition-colors"
+                      className="px-2 py-0.5 bg-green-700 hover:bg-green-600 text-black font-mono text-[10px] font-bold rounded transition-colors"
                     >
                       SUBMIT FLAG
                     </button>
@@ -1229,14 +1319,14 @@ export default function PrisonPage() {
                         const token = getToken();
                         if (token) startGame(token, true);
                       }}
-                      className="px-2 py-0.5 bg-green-900 hover:bg-green-800 text-green-400 font-mono text-xs rounded border border-green-700 transition-colors"
+                      className="px-2 py-0.5 bg-green-900 hover:bg-green-800 text-green-400 font-mono text-[10px] rounded border border-green-700 transition-colors"
                     >
                       RESTART
                     </button>
                   )}
                   <a
                     href="/challenges"
-                    className="text-green-700 hover:text-green-500 font-mono text-xs transition-colors"
+                    className="text-green-700 hover:text-green-500 font-mono text-[10px] transition-colors"
                   >
                     [Back]
                   </a>
@@ -1251,13 +1341,13 @@ export default function PrisonPage() {
                   {/* Terminal output */}
                   <div
                     ref={terminalRef}
-                    className="flex-1 overflow-y-auto px-3 py-2 font-mono text-sm z-10 min-h-0"
+                    className="flex-1 overflow-y-auto px-3 py-2 font-mono text-xs z-10 min-h-0"
                     onClick={() => inputRef.current?.focus()}
                   >
                     {lines.map((line, i) => (
                       <div
                         key={i}
-                        className={`whitespace-pre-wrap mb-1 ${getLineColor(line)}`}
+                        className={`whitespace-pre-wrap mb-0.5 ${getLineColor(line)}`}
                       >
                         {line.text}
                       </div>
@@ -1292,7 +1382,7 @@ export default function PrisonPage() {
                       onChange={(e) => setInput(e.target.value)}
                       disabled={isInputDisabled()}
                       placeholder={getPlaceholder()}
-                      className={`flex-1 bg-transparent font-mono text-sm outline-none caret-green-400 ${
+                      className={`flex-1 bg-transparent font-mono text-xs outline-none caret-green-400 ${
                         terminalMode === "dos"
                           ? "text-gray-200 placeholder-gray-700"
                           : terminalMode === "wopr"

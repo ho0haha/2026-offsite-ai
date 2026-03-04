@@ -226,6 +226,7 @@ type Challenge = {
   solved?: boolean;
   validationType?: string | null;
   solveCount?: number;
+  solvePosition?: number | null;
 };
 
 type TierGroup = {
@@ -258,12 +259,11 @@ const DIFFICULTY_PREFIX: Record<string, string> = {
   legendary: "[!!]",
 };
 
-function getNextBonus(solveCount: number): { label: string; color: string } | null {
-  if (solveCount === 0) return { label: "1st solve: +30%", color: "text-amber-300 bg-amber-500/15 border-amber-500/30" };
-  if (solveCount === 1) return { label: "2nd solve: +20%", color: "text-amber-400/80 bg-amber-500/10 border-amber-500/20" };
-  if (solveCount === 2) return { label: "3rd solve: +10%", color: "text-amber-400/60 bg-amber-500/8 border-amber-500/15" };
-  return null;
-}
+const SOLVE_POSITION_BADGE: Record<number, { label: string; icon: string; color: string; glow: string }> = {
+  1: { label: "1st Solve +30%", icon: "\uD83E\uDD47", color: "from-amber-400 to-yellow-300 text-amber-950", glow: "shadow-[0_0_20px_rgba(251,191,36,0.5),0_0_40px_rgba(251,191,36,0.3)]" },
+  2: { label: "2nd Solve +20%", icon: "\uD83E\uDD48", color: "from-slate-300 to-zinc-200 text-slate-800", glow: "shadow-[0_0_16px_rgba(203,213,225,0.4),0_0_32px_rgba(203,213,225,0.2)]" },
+  3: { label: "3rd Solve +10%", icon: "\uD83E\uDD49", color: "from-orange-400 to-amber-600 text-orange-950", glow: "shadow-[0_0_16px_rgba(251,146,60,0.4),0_0_32px_rgba(251,146,60,0.2)]" },
+};
 
 function getBadge(tier: number) {
   return TIER_BADGES[Math.max(0, Math.min(tier - 1, TIER_BADGES.length - 1))];
@@ -647,15 +647,20 @@ export default function ChallengesPage() {
                           {ch.category}
                         </span>
                       )}
-                      {!ch.solved && (() => {
-                        const bonus = getNextBonus(ch.solveCount ?? 0);
-                        return bonus ? (
-                          <span className={`px-2 py-0.5 rounded text-xs font-mono font-medium border ${bonus.color}`}>
-                            {bonus.label}
-                          </span>
-                        ) : null;
-                      })()}
                     </div>
+
+                    {/* Speed Bonus Badge -- shown on solved cards for 1st/2nd/3rd */}
+                    {ch.solved && ch.solvePosition && SOLVE_POSITION_BADGE[ch.solvePosition] && (() => {
+                      const badge = SOLVE_POSITION_BADGE[ch.solvePosition!];
+                      return (
+                        <div
+                          className={`mb-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r ${badge.color} font-bold text-sm font-mono ${badge.glow} animate-pulse-subtle`}
+                        >
+                          <span className="text-lg">{badge.icon}</span>
+                          <span>{badge.label}</span>
+                        </div>
+                      );
+                    })()}
 
                     {/* Description */}
                     {ch.description && (

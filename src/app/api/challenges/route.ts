@@ -44,16 +44,38 @@ export async function GET(req: NextRequest) {
       .all();
     const solvedSet = new Set(solved.map((s) => s.challengeId!));
 
-    // Get global solve counts per challenge (for first-solver bonus display)
+    // Get all correct submissions (for solve position calculation)
     const allCorrectSubmissions = await db
-      .select({ challengeId: submissions.challengeId })
+      .select({
+        challengeId: submissions.challengeId,
+        participantId: submissions.participantId,
+        submittedAt: submissions.submittedAt,
+      })
       .from(submissions)
       .where(eq(submissions.isCorrect, true))
       .all();
+
+    // Build solve count map and per-user solve position map
     const solveCountMap: Record<string, number> = {};
+    const solvesByChallenge: Record<string, { participantId: string; submittedAt: string }[]> = {};
     for (const s of allCorrectSubmissions) {
       if (!s.challengeId) continue;
       solveCountMap[s.challengeId] = (solveCountMap[s.challengeId] || 0) + 1;
+      if (!solvesByChallenge[s.challengeId]) solvesByChallenge[s.challengeId] = [];
+      solvesByChallenge[s.challengeId].push({
+        participantId: s.participantId!,
+        submittedAt: s.submittedAt!,
+      });
+    }
+
+    // For each challenge, sort by time and find this user's position
+    const userSolvePositionMap: Record<string, number> = {};
+    for (const [chId, solves] of Object.entries(solvesByChallenge)) {
+      solves.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+      const idx = solves.findIndex((s) => s.participantId === participantId);
+      if (idx !== -1) {
+        userSolvePositionMap[chId] = idx + 1; // 1-indexed position
+      }
     }
 
     // Get tier status
@@ -137,6 +159,7 @@ export async function GET(req: NextRequest) {
               validationType: c.validationType,
               solved: solvedSet.has(c.id),
               solveCount: solveCountMap[c.id] || 0,
+              solvePosition: solvedSet.has(c.id) ? (userSolvePositionMap[c.id] ?? null) : null,
             };
           }),
         };

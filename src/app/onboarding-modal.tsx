@@ -225,14 +225,6 @@ function StepSetup() {
           </p>
         </SetupStep>
 
-        <SetupStep
-          num={4}
-          title="LLM Access (Challenges 8, 9 & 16)"
-        >
-          <p className="text-sm text-muted-foreground mt-1">
-            Some challenges involve using an LLM. A Claude Haiku proxy is provided through the CTF server — no API key needed. Use <code className="text-primary">ctf_helper.ask_llm()</code> from your Python code.
-          </p>
-        </SetupStep>
       </div>
     </div>
   );
@@ -426,7 +418,7 @@ function StepReady() {
           title="Remember"
           items={[
             "Everything is in the ZIP download",
-            "LLM proxy built in — no API key needed",
+            "Each challenge README has all you need",
             "Some challenges auto-submit",
             "Tier 7 = endgame glory",
           ]}

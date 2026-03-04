@@ -230,6 +230,7 @@ export default function PrisonPage() {
         // Show boot device selection menu
         setLines([]);
         setTerminalMode("boot_menu");
+        setMonitorState("ready");
         setSelectedBootIdx(0);
       }
     };

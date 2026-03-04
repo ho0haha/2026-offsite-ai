@@ -14,8 +14,7 @@ const UNLOCK_RULES: Record<number, string> = {
   3: "Complete 2 or more Tier 2 challenges",
   4: "Complete 2 or more Tier 3 challenges",
   5: "Complete 2 or more Tier 4 challenges",
-  6: "Complete 2 or more Tier 5 challenges",
-  7: "Complete all Tier 6 challenges",
+  7: "Complete all Tier 5 challenges",
 };
 
 export function getUnlockRule(tier: number): string {
@@ -85,13 +84,8 @@ export async function getParticipantTierStatus(
     maxTier = 5;
   }
 
-  // Tier 6 unlocks when 2+ Tier 5 challenges are solved
-  if (maxTier >= 5 && solvesByTier["5"] >= 2) {
-    maxTier = 6;
-  }
-
-  // Tier 7 unlocks when ALL Tier 6 challenges are solved
-  if (maxTier >= 6 && totalByTier["6"] > 0 && solvesByTier["6"] >= totalByTier["6"]) {
+  // Tier 7 unlocks when ALL Tier 5 challenges are solved (no tier 6)
+  if (maxTier >= 5 && totalByTier["5"] > 0 && solvesByTier["5"] >= totalByTier["5"]) {
     maxTier = 7;
   }
 

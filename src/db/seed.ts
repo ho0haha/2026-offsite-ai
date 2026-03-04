@@ -8,6 +8,7 @@ import { nanoid } from "nanoid";
 // No external URLs needed — bundles are embedded in the server deployment.
 
 const challenges = [
+  // ── Tier 1: Warm-up (4 challenges) ──────────────────────────────────
   {
     title: "Hello AI",
     description:
@@ -68,6 +69,7 @@ const challenges = [
     validationType: "server",
     requiredFiles: ["app/server.py"],
   },
+  // ── Tier 2: Intermediate (2 challenges) ─────────────────────────────
   {
     title: "Spaghetti Untangler",
     description:
@@ -98,43 +100,7 @@ const challenges = [
     validationType: "upload",
     requiredFiles: ["test_inventory.py"],
   },
-  {
-    title: "Prompt Craftsman",
-    description:
-      "5 prompt engineering mini-challenges. Each gives you a Python function and a task.\n\nChallenges:\n1. Generate comprehensive docstrings for a complex function\n2. Identify a subtle bug pattern across 3 similar functions\n3. Suggest a performance optimization with before/after code\n4. Explain time complexity in plain English\n5. Write a database migration plan from the code diff\n\nYour prompts must produce output matching specific criteria. Run: python validate_all.py to check all 5 and get the flag.",
-    category: "advanced-mastery",
-    difficulty: "medium",
-    points: 200,
-    flag: "FLAG{prompt_craftsman_5_for_5}",
-    hints: [],
-    sortOrder: 7,
-    tier: 2,
-
-    starterUrl: null,
-    validationType: "server",
-    requiredFiles: [
-      "outputs/output1.md",
-      "outputs/output2.md",
-      "outputs/output3.md",
-      "outputs/output4.md",
-      "outputs/output5.md",
-    ],
-  },
-  {
-    title: "Smart Feedback Sorter",
-    description:
-      "Build a Python script that uses Claude to categorize 50 customer feedback entries.\n\nYour task:\n1. feedback.csv has 50 entries to categorize into: service, food quality, wait time, cleanliness, other\n2. Each entry also needs sentiment: positive or negative\n3. Use ctf_helper.ask_llm() to call Claude Haiku via the server proxy (no API key needed)\n4. Output results to output.csv\n5. Run: python validate.py — flag at 85%+ accuracy against ground truth",
-    category: "building-with-llms",
-    difficulty: "medium",
-    points: 250,
-    flag: "FLAG{smart_sorter_85_percent_acc}",
-    hints: [],
-    sortOrder: 8,
-    tier: 3,
-    starterUrl: null,
-    validationType: "server",
-    requiredFiles: ["output.csv"],
-  },
+  // ── Tier 3: Advanced (3 challenges) ─────────────────────────────────
   {
     title: "Spec Builder + Build",
     description:
@@ -144,7 +110,7 @@ const challenges = [
     points: 500,
     flag: "FLAG{spec_builder_prd_2_pr0duct}",
     hints: [],
-    sortOrder: 9,
+    sortOrder: 7,
     tier: 3,
     starterUrl: null,
     validationType: "server",
@@ -159,12 +125,28 @@ const challenges = [
     points: 300,
     flag: "FLAG{ai_menu_assistant_8_of_10}",
     hints: [],
-    sortOrder: 10,
+    sortOrder: 8,
     tier: 3,
     starterUrl: null,
     validationType: "upload",
     requiredFiles: ["chatbot.py"],
   },
+  {
+    title: "Smart Feedback Sorter",
+    description:
+      "Build a Python script that uses Claude to categorize 50 customer feedback entries.\n\nYour task:\n1. feedback.csv has 50 entries to categorize into: service, food quality, wait time, cleanliness, other\n2. Each entry also needs sentiment: positive or negative\n3. Use ctf_helper.ask_llm() to call Claude Haiku via the server proxy (no API key needed)\n4. Output results to output.csv\n5. Run: python validate.py — flag at 85%+ accuracy against ground truth",
+    category: "building-with-llms",
+    difficulty: "medium",
+    points: 250,
+    flag: "FLAG{smart_sorter_85_percent_acc}",
+    hints: [],
+    sortOrder: 9,
+    tier: 3,
+    starterUrl: null,
+    validationType: "server",
+    requiredFiles: ["output.csv"],
+  },
+  // ── Tier 4: Hard (6 challenges) ─────────────────────────────────────
   {
     title: "Context is King",
     description:
@@ -178,7 +160,7 @@ const challenges = [
       { text: "Use your AI tool's file reference features to include all relevant files", cost: 150 },
       { text: "Consider creating a project context file to help your AI tool understand the project structure", cost: 250 },
     ],
-    sortOrder: 11,
+    sortOrder: 10,
     tier: 4,
     starterUrl: null,
     validationType: "upload",
@@ -189,6 +171,27 @@ const challenges = [
       "restaurant_system/payment_service.py",
       "restaurant_system/reporting.py",
       "restaurant_system/formatters.py",
+    ],
+  },
+  {
+    title: "Prompt Craftsman",
+    description:
+      "5 prompt engineering mini-challenges. Each gives you a Python function and a task.\n\nChallenges:\n1. Generate comprehensive docstrings for a complex function\n2. Identify a subtle bug pattern across 3 similar functions\n3. Suggest a performance optimization with before/after code\n4. Explain time complexity in plain English\n5. Write a database migration plan from the code diff\n\nYour prompts must produce output matching specific criteria. Run: python validate_all.py to check all 5 and get the flag.",
+    category: "advanced-mastery",
+    difficulty: "medium",
+    points: 200,
+    flag: "FLAG{prompt_craftsman_5_for_5}",
+    hints: [],
+    sortOrder: 11,
+    tier: 4,
+    starterUrl: null,
+    validationType: "server",
+    requiredFiles: [
+      "outputs/output1.md",
+      "outputs/output2.md",
+      "outputs/output3.md",
+      "outputs/output4.md",
+      "outputs/output5.md",
     ],
   },
   {
@@ -249,7 +252,7 @@ const challenges = [
       { text: "Think about: NaN, Inf, empty inputs, negative numbers, unicode, extremely long strings", cost: 350 },
     ],
     sortOrder: 14,
-    tier: 5,
+    tier: 4,
     starterUrl: null,
     validationType: "upload",
     requiredFiles: ["functions.py"],
@@ -268,11 +271,12 @@ const challenges = [
       { text: "Read the 'hint' field in every response carefully, including error responses", cost: 300 },
     ],
     sortOrder: 15,
-    tier: 5,
+    tier: 4,
     starterUrl: null,
     validationType: "server",
     requiredFiles: ["solution.py"],
   },
+  // ── Tier 5: Expert (4 challenges) ───────────────────────────────────
   {
     title: "The Agent Maze",
     description:
@@ -306,18 +310,57 @@ const challenges = [
       { text: "The async, cache, and sort challenges are often the quickest to solve", cost: 500 },
     ],
     sortOrder: 17,
-    tier: 6,
+    tier: 5,
     starterUrl: null,
     validationType: "upload",
     requiredFiles: ["run_gauntlet.py"],
   },
   {
+    title: "Only Murders at 127.0.0.1",
+    description:
+      "Tech founder Julian Voss was hosting an exclusive demo night at his downtown Chicago penthouse. At 11:47 PM, he was found dead at his desk. Six guests remain in the building.\n\nYour job: figure out who killed him, how they did it, and why.\n\nThe Setup:\n- Six AI-powered suspects available for questioning through the CTF server API\n- Each has their own personality, secrets, and agenda\n- The crime scene can be examined for physical evidence\n\nRules:\n- 6 messages per character (36 total across all 6)\n- 3 conversation modes: private (1-on-1), group (2-3 characters together), confront (present evidence)\n- 6 crime scene examinations total\n- 3 accusation attempts — choose wisely\n\nMake a formal accusation with: suspect (who), method (how), and motive (why).\n\nSuspects: Diana Croft, Marcus Webb, Suki Tanaka, Raj Patel, Elena Vasquez, Tommy Zhao",
+    category: "investigation",
+    difficulty: "hard",
+    points: 1000,
+    flag: "__DYNAMIC__",
+    hints: [
+      { text: "Everyone has something to hide.", cost: 150 },
+      { text: "Things aren't always what they seem.", cost: 300 },
+      { text: "The most helpful person in the room isn't always your friend.", cost: 500 },
+    ],
+    sortOrder: 18,
+    tier: 5,
+    starterUrl: null,
+    validationType: "server",
+    requiredFiles: null as unknown as string[],
+  },
+  {
+    title: "Roy G Biv",
+    description:
+      "You've intercepted a mysterious file encoded in the .rgbiv image format. Your mission: decode it, understand what you see, and extract the hidden flag.\n\nThe File:\nspectrum.rgbiv — a binary image file using a custom format with CRLE compression.\n\nYour task:\n1. Study the .rgbiv format specification (32-byte header, palette, CRLE compression)\n2. Build a decoder that handles all CRLE opcodes: LITERAL, REPEAT, COPY_PREV, DELTA_RUN, FILL_PAIR, NESTED_REPEAT, ROW_COPY, END\n3. Pay attention to header flags: has_data_row, delta_mode, fill_order\n4. Decode the image and examine what you see\n5. The image contains seven visual elements, each holding a two-digit number\n6. The numbers form a key that unlocks hidden data in the image\n\nSubmit the flag in the format CTF{...}",
+    category: "reverse-engineering",
+    difficulty: "hard",
+    points: 1000,
+    flag: "CTF{pr1sm_d3c0d3d_r41nb0w_m4st3r}",
+    hints: [
+      { text: "The header contains more than just dimensions. Try different flag combinations.", cost: 150 },
+      { text: "Look carefully at what you see. Some things are easier to read than others.", cost: 300 },
+      { text: "The image contains seven visual elements. Each holds a two-digit number. The numbers form a key that unlocks the data.", cost: 500 },
+    ],
+    sortOrder: 19,
+    tier: 5,
+    starterUrl: null,
+    validationType: "flag",
+    requiredFiles: null as unknown as string[],
+  },
+  // ── Tier 7: Legendary (1 challenge) ─────────────────────────────────
+  {
     title: "A Prison of My Own Design",
     description:
-      "You wake in a prison cell. 200 turns. One way out. No second chances.\n\nThis is a text-based escape room played through a terminal interface. Navigate 15 rooms, solve 7 chained puzzles, earn the trust of NPCs, and find the exit before lights-out.\n\nRules:\n- Type commands to interact (LOOK, EXAMINE, TALK TO, USE, COMBINE, etc.)\n- Some actions have permanent consequences. Think before you act.\n- Be polite to people. Or don't. Choices matter.\n- 200 turns. That's all you get.\n\nClick 'Play' to begin.",
+      "The final challenge. No local files. No test suite. Just you, your AI, and a text-based prison.\n\nThis is a live, server-hosted text adventure game. Navigate a prison, solve puzzles, interact with NPCs, and escape — all within 120 turns.\n\nRules:\n- Type commands to interact (LOOK, EXAMINE, TALK TO, USE, COMBINE, etc.)\n- Some actions have permanent consequences. Think before you act.\n- Free commands (no turn cost): help, inventory, look, examine, read, listen, smell\n- All other commands cost 1 turn\n- Inventory limit of 6 items\n- Guards patrol on a schedule — get caught where you shouldn't be and face consequences\n- 120 turns. That's all you get.\n\nClick 'Play' to begin.",
     category: "escape-room",
     difficulty: "legendary",
-    points: 1000,
+    points: 2000,
     flag: "__DYNAMIC__",
     hints: [
       { text: "Start by examining your cell carefully. The walls have stories to tell.", cost: 100 },

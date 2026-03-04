@@ -20,6 +20,8 @@ export const participants = sqliteTable("participants", {
   nukedAt: text("nuked_at"),
   nukedBy: text("nuked_by"),
   nukesLaunched: integer("nukes_launched").default(0),
+  woprDisconnects: integer("wopr_disconnects").default(0),
+  diskWiped: integer("disk_wiped", { mode: "boolean" }).default(false),
 });
 
 export const challenges = sqliteTable("challenges", {

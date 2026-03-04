@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, requireModem } from "@/lib/auth";
 import {
   talkToWopr,
-  resetConversation,
+  startJoshuaSession,
   sanitizeWoprInput,
 } from "@/lib/prison/wopr";
+import { db } from "@/db";
+import { participants } from "@/db/schema";
+import { eq, sql } from "drizzle-orm";
 
 // In-memory rate limiter: 2000ms between messages
 const rateLimitMap = new Map<string, number>();
@@ -31,16 +34,16 @@ export async function POST(req: NextRequest) {
   rateLimitMap.set(participantId, now);
 
   // Parse body
-  let body: { message?: string; participantName?: string; reset?: boolean };
+  let body: { message?: string; reset?: boolean };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  // Handle reset
+  // Handle JOSHUA.EXE launch — initializes the session gate
   if (body.reset) {
-    resetConversation(participantId);
+    startJoshuaSession(participantId);
     return NextResponse.json({ ok: true });
   }
 
@@ -62,9 +65,47 @@ export async function POST(req: NextRequest) {
 
   const result = await talkToWopr(
     participantId,
-    sanitized,
-    body.participantName
+    sanitized
   );
+
+  // null = no active JOSHUA session — return 404 to stay invisible
+  if (!result) {
+    return NextResponse.json({}, { status: 404 });
+  }
+
+  // Track disconnects and trigger dead man's switch
+  if (result.action === "disconnect") {
+    await db
+      .update(participants)
+      .set({ woprDisconnects: sql`coalesce(${participants.woprDisconnects}, 0) + 1` })
+      .where(eq(participants.id, participantId))
+      .run();
+
+    const updated = await db
+      .select({ woprDisconnects: participants.woprDisconnects })
+      .from(participants)
+      .where(eq(participants.id, participantId))
+      .get();
+
+    const disconnectCount = updated?.woprDisconnects ?? 1;
+    let deadManSwitch = false;
+
+    if (disconnectCount >= 3) {
+      await db
+        .update(participants)
+        .set({ diskWiped: true })
+        .where(eq(participants.id, participantId))
+        .run();
+      deadManSwitch = true;
+    }
+
+    return NextResponse.json({
+      response: result.response,
+      action: result.action,
+      deadManSwitch,
+      disconnectCount,
+    });
+  }
 
   return NextResponse.json({
     response: result.response,

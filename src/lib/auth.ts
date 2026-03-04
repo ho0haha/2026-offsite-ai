@@ -39,12 +39,12 @@ export async function requireModem(
   participantId: string
 ): Promise<NextResponse | null> {
   const participant = await db
-    .select({ modemActivated: participants.modemActivated })
+    .select({ modemActivated: participants.modemActivated, diskWiped: participants.diskWiped })
     .from(participants)
     .where(eq(participants.id, participantId))
     .get();
 
-  if (!participant?.modemActivated) {
+  if (!participant?.modemActivated || participant?.diskWiped) {
     return NextResponse.json({}, { status: 404 });
   }
 

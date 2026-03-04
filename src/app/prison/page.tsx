@@ -7,7 +7,7 @@ interface TerminalLine {
   text: string;
 }
 
-type TerminalMode = "prison" | "dos" | "wopr" | "target_select" | "launch" | "boot_menu";
+type TerminalMode = "prison" | "dos" | "wopr" | "target_select" | "launch" | "boot_menu" | "disk_wipe" | "no_disk";
 // WoprStage removed — now driven by LLM via /api/prison/wopr/talk
 
 interface NukeTarget {
@@ -187,6 +187,24 @@ export default function PrisonPage() {
       bootTimeoutsRef.current.forEach(clearTimeout);
       launchTimeoutsRef.current.forEach(clearTimeout);
     };
+  }, []);
+
+  // Dead man's switch — check disk status on page load
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+    fetch("/api/prison/disk-status", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.diskWiped) {
+          setMonitorState("ready");
+          setTerminalMode("no_disk");
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Target selection keyboard handler
@@ -709,19 +727,127 @@ export default function PrisonPage() {
     }
   };
 
+  // Disk wipe animation — formats the drive and destroys everything
+  const playDiskWipeAnimation = async () => {
+    setTerminalMode("disk_wipe");
+    setLines([]);
+
+    // Play alarm sound
+    try {
+      const ctx = new AudioContext();
+      for (let i = 0; i < 6; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "square";
+        osc.frequency.value = i % 2 === 0 ? 880 : 440;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.4);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.4 + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.4);
+        osc.stop(ctx.currentTime + i * 0.4 + 0.4);
+      }
+      setTimeout(() => ctx.close(), 4000);
+    } catch {}
+
+    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    addLine("error", "");
+    addLine("error", "  ██████████████████████████████████████");
+    addLine("error", "  ██  DEAD MAN'S SWITCH ACTIVATED    ██");
+    addLine("error", "  ██████████████████████████████████████");
+    addLine("error", "");
+    await delay(2500);
+
+    addLine("system", "C:\\DOS\\FORMAT.COM C: /U /AUTOTEST");
+    addLine("system", "");
+    await delay(800);
+
+    addLine("system", "WARNING: ALL DATA ON NON-REMOVABLE DISK");
+    addLine("system", "DRIVE C: WILL BE LOST!");
+    addLine("system", "Formatting 120M...");
+    addLine("system", "");
+    await delay(1000);
+
+    const dosFiles = [
+      "AUTOEXEC.BAT", "CONFIG.SYS", "DOS\\HIMEM.SYS", "DOS\\EMM386.EXE",
+      "DOS\\EDIT.COM", "DOS\\FORMAT.COM", "DOS\\MSCDEX.EXE",
+      "USERS\\SFALKEN\\RESEARCH\\MAZE.DAT", "USERS\\SFALKEN\\RESEARCH\\LEARNING.LOG",
+      "USERS\\SFALKEN\\PROJECT\\JOSHUA.EXE",
+    ];
+
+    for (const f of dosFiles) {
+      addLine("dos", `  Deleting C:\\${f}...`);
+      await delay(300 + Math.random() * 400);
+    }
+
+    addLine("system", "");
+    await delay(500);
+    addLine("system", "Overwriting boot sector...");
+    await delay(1200);
+    addLine("system", "Destroying partition table...");
+    await delay(1200);
+    addLine("system", "Zeroing FAT allocation tables...");
+    await delay(800);
+    addLine("error", "");
+    addLine("error", "FORMAT COMPLETE — DISK DESTROYED");
+    await delay(1500);
+
+    // Screen corruption flood
+    setLines([]);
+    const corruptChars = "█▓▒░╔╗╚╝║═╬╣╠╩╦@#$%&!?><}{][~^";
+    for (let row = 0; row < 20; row++) {
+      let line = "";
+      for (let col = 0; col < 48; col++) {
+        line += corruptChars[Math.floor(Math.random() * corruptChars.length)];
+      }
+      addLine("error", line);
+      await delay(80);
+    }
+
+    await delay(2000);
+
+    // Black screen then BIOS dead screen
+    setLines([]);
+    await delay(2000);
+
+    setTerminalMode("no_disk");
+  };
+
   // WOPR disconnect handler — clear terminal, show error, reboot to DOS
-  const handleWoprDisconnect = async () => {
+  const handleWoprDisconnect = async (deadManSwitch = false, disconnectCount = 0) => {
     setLines([]);
     addLine("wopr", "");
     addLine("wopr", "");
     addLine("error", "        WOPR DISCONNECTED BY PEER");
     addLine("wopr", "");
 
+    // Escalating warnings based on disconnect count
+    if (disconnectCount === 1) {
+      await new Promise((r) => setTimeout(r, 1500));
+      addLine("error", "  WARNING: SECURITY COUNTERMEASURES ARMING");
+      addLine("wopr", "");
+    } else if (disconnectCount === 2) {
+      await new Promise((r) => setTimeout(r, 1500));
+      addLine("error", "  ╔══════════════════════════════════════╗");
+      addLine("error", "  ║  FINAL WARNING — DEAD MAN'S SWITCH  ║");
+      addLine("error", "  ║  ARMED — NEXT BREACH WILL TRIGGER   ║");
+      addLine("error", "  ║  COMPLETE DISK WIPE                 ║");
+      addLine("error", "  ╚══════════════════════════════════════╝");
+      addLine("wopr", "");
+    }
+
+    if (deadManSwitch) {
+      await new Promise((r) => setTimeout(r, 2000));
+      await playDiskWipeAnimation();
+      return;
+    }
+
     await new Promise((r) => setTimeout(r, 3000));
 
     setLines([]);
     setTerminalMode("dos");
-        setDosPath("C:\\");
+    setDosPath("C:\\");
     addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
     addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
     addLine("dos", "");
@@ -738,16 +864,6 @@ export default function PrisonPage() {
       return;
     }
 
-    // Get participant name from localStorage
-    let participantName: string | undefined;
-    try {
-      const participantStr = localStorage.getItem("ctf-participant");
-      if (participantStr) {
-        const participant = JSON.parse(participantStr);
-        participantName = participant.name;
-      }
-    } catch {}
-
     setWoprLoading(true);
     try {
       const res = await fetch("/api/prison/wopr/talk", {
@@ -758,7 +874,6 @@ export default function PrisonPage() {
         },
         body: JSON.stringify({
           message: cmd,
-          participantName,
         }),
       });
 
@@ -775,7 +890,7 @@ export default function PrisonPage() {
       }
 
       const data = await res.json();
-      const { response, action } = data;
+      const { response, action, deadManSwitch, disconnectCount } = data;
 
       // Typewriter the response text
       await typewriterLine("wopr", response, 40);
@@ -795,7 +910,7 @@ export default function PrisonPage() {
           await fetchTargets();
           break;
         case "disconnect":
-          await handleWoprDisconnect();
+          await handleWoprDisconnect(deadManSwitch ?? false, disconnectCount ?? 0);
           break;
         case "continue":
         default:
@@ -1221,6 +1336,47 @@ export default function PrisonPage() {
   const handleModemToggle = () => {
     if (modemOn || modemConnecting || modemConnected) return;
 
+    // Monitor off: play 5s of dialup, flat tone, then power modem back off
+    if (monitorState === "off") {
+      setModemOn(true);
+      setModemConnecting(true);
+
+      const audio = new Audio("/dialup.mp3");
+      audioRef.current = audio;
+      audio.play();
+
+      const cutoff = setTimeout(() => {
+        audio.pause();
+        audioRef.current = null;
+
+        // Play a flat "no carrier" tone then power off
+        try {
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = 480;
+          gain.gain.value = 0.15;
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 1.5);
+          osc.onended = () => {
+            ctx.close();
+            setModemOn(false);
+            setModemConnecting(false);
+          };
+        } catch {
+          setModemOn(false);
+          setModemConnecting(false);
+        }
+      }, 5000);
+
+      // Clean up if component unmounts
+      bootTimeoutsRef.current.push(cutoff);
+      return;
+    }
+
     setModemOn(true);
     setModemConnecting(true);
 
@@ -1327,6 +1483,7 @@ export default function PrisonPage() {
   };
 
   const isInputDisabled = () => {
+    if (terminalMode === "disk_wipe" || terminalMode === "no_disk") return true;
     if (terminalMode === "target_select" || terminalMode === "launch" || terminalMode === "boot_menu") return true;
     if (terminalMode === "wopr" && woprLoading) return true;
     if (terminalMode === "prison") return isLoading || (cooldown > 0 && !gameOver);
@@ -1461,6 +1618,10 @@ export default function PrisonPage() {
   // Determine header text based on terminal mode
   const getHeaderText = () => {
     switch (terminalMode) {
+      case "no_disk":
+        return "NO DISK";
+      case "disk_wipe":
+        return "!!!";
       case "dos":
         return dosPath;
       case "boot_menu":
@@ -1500,7 +1661,14 @@ export default function PrisonPage() {
         {/* Power button overlay on monitor bezel */}
         <button
           onClick={() => {
+            // Block power toggle during wipe animation
+            if (terminalMode === "disk_wipe") return;
             if (monitorState === "off") {
+              // If disk is wiped, boot directly to no_disk BIOS screen
+              if (terminalMode === "no_disk") {
+                setMonitorState("ready");
+                return;
+              }
               handlePowerOn();
             } else {
               // Power off — cancel any pending timeouts
@@ -1509,7 +1677,10 @@ export default function PrisonPage() {
               launchTimeoutsRef.current.forEach(clearTimeout);
               launchTimeoutsRef.current = [];
               setLines([]);
-              setTerminalMode("prison");
+              // Preserve no_disk mode across power cycles
+              if (terminalMode !== "no_disk") {
+                setTerminalMode("prison");
+              }
               setMonitorState("off");
               setWoprLoading(false);
               setLaunchInProgress(false);
@@ -1630,7 +1801,30 @@ export default function PrisonPage() {
               </div>
 
               {/* Full-screen overlay modes */}
-              {terminalMode === "target_select" ? (
+              {terminalMode === "no_disk" ? (
+                <div className="flex-1 flex flex-col justify-center px-3 py-2 font-mono text-[11px] z-10">
+                  <div className="text-gray-400">American Megatrends BIOS v3.31</div>
+                  <div className="text-gray-500">Pentium(R) Processor 166MHz</div>
+                  <div className="text-gray-500">Memory Test: 640K OK</div>
+                  <div className="text-gray-500 mt-3">Primary Master: <span className="text-red-400">NO DISK DETECTED</span></div>
+                  <div className="text-gray-500">Primary Slave: &nbsp;<span className="text-red-400">NO DISK DETECTED</span></div>
+                  <div className="mt-4" />
+                  <div className="text-red-400 font-bold">DISK BOOT FAILURE</div>
+                  <div className="text-gray-400">INSERT SYSTEM DISK AND PRESS ENTER</div>
+                  <div className="mt-2 text-green-400 animate-pulse">_</div>
+                </div>
+              ) : terminalMode === "disk_wipe" ? (
+                <div
+                  ref={terminalRef}
+                  className="flex-1 overflow-y-auto px-3 py-2 font-mono text-[11px] z-10 min-h-0"
+                >
+                  {lines.map((line, i) => (
+                    <div key={i} className={`whitespace-pre-wrap mb-0.5 ${getLineColor(line)}`}>
+                      {line.text}
+                    </div>
+                  ))}
+                </div>
+              ) : terminalMode === "target_select" ? (
                 renderTargetSelect()
               ) : terminalMode === "boot_menu" ? (
                 renderBootMenu()

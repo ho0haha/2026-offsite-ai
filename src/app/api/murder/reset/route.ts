@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { db } from "@/db";
-import { boardroomSessions } from "@/db/schema";
+import { murderSessions } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
@@ -13,13 +13,13 @@ export async function POST(req: NextRequest) {
   // Find active session
   const existing = await db
     .select()
-    .from(boardroomSessions)
+    .from(murderSessions)
     .where(
       and(
-        eq(boardroomSessions.participantId, participantId),
-        eq(boardroomSessions.eventId, eventId),
-        eq(boardroomSessions.isComplete, false),
-        isNull(boardroomSessions.abandonedAt)
+        eq(murderSessions.participantId, participantId),
+        eq(murderSessions.eventId, eventId),
+        eq(murderSessions.isComplete, false),
+        isNull(murderSessions.abandonedAt)
       )
     )
     .get();
@@ -32,14 +32,16 @@ export async function POST(req: NextRequest) {
 
   // Mark as abandoned
   await db
-    .update(boardroomSessions)
+    .update(murderSessions)
     .set({ abandonedAt: new Date().toISOString() })
-    .where(eq(boardroomSessions.id, existing.id))
+    .where(eq(murderSessions.id, existing.id))
     .run();
 
   return NextResponse.json({
-    message: "Session reset. All conversations cleared. Call /api/boardroom/start to begin a new session.",
+    message:
+      "Session reset. All conversations and evidence cleared. Call /api/murder/start to begin a new investigation.",
     previousSessionId: existing.id,
     previousTotalMessages: existing.totalMessages,
+    previousAccusationAttempts: existing.accusationAttempts,
   });
 }

@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { db } from "@/db";
-import { boardroomSessions, challenges } from "@/db/schema";
+import { murderSessions, challenges } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { validateFlag } from "@/lib/boardroom/engine";
-import { generateBoardroomFlag } from "@/lib/boardroom/flag-generator";
+import { validateAccusation } from "@/lib/murder/engine";
+import { generateMurderFlag } from "@/lib/murder/flag-generator";
 import {
-  MAX_FLAG_ATTEMPTS,
+  MAX_ACCUSATION_ATTEMPTS,
   MAX_MESSAGES_PER_CHARACTER,
   CHARACTER_IDS,
   CHALLENGE_SORT_ORDER,
-} from "@/lib/boardroom/constants";
+} from "@/lib/murder/constants";
+import type { Accusation } from "@/lib/murder/types";
 
 export async function POST(req: NextRequest) {
   // Auth gate
@@ -19,17 +20,35 @@ export async function POST(req: NextRequest) {
   const { participantId, eventId } = authResult;
 
   // Parse body
-  let body: { sessionId: string; flag: string };
+  let body: { sessionId: string; accusation: Accusation };
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 }
+    );
   }
 
-  const { sessionId, flag } = body;
-  if (!sessionId || !flag) {
+  const { sessionId, accusation } = body;
+  if (!sessionId || !accusation) {
     return NextResponse.json(
-      { error: "sessionId and flag are required" },
+      { error: "sessionId and accusation are required" },
+      { status: 400 }
+    );
+  }
+
+  if (!accusation.suspect || !accusation.method || !accusation.motive) {
+    return NextResponse.json(
+      {
+        error:
+          "accusation must include suspect, method, and motive fields",
+        example: {
+          suspect: "character_name",
+          method: "how_they_did_it",
+          motive: "why_they_did_it",
+        },
+      },
       { status: 400 }
     );
   }
@@ -37,11 +56,11 @@ export async function POST(req: NextRequest) {
   // Load session — verify ownership
   const session = await db
     .select()
-    .from(boardroomSessions)
+    .from(murderSessions)
     .where(
       and(
-        eq(boardroomSessions.id, sessionId),
-        eq(boardroomSessions.participantId, participantId)
+        eq(murderSessions.id, sessionId),
+        eq(murderSessions.participantId, participantId)
       )
     )
     .get();
@@ -58,13 +77,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Check attempt limit
-  const attempts = (session.flagAttempts || 0) + 1;
-  if (attempts > MAX_FLAG_ATTEMPTS) {
+  const attempts = (session.accusationAttempts || 0) + 1;
+  if (attempts > MAX_ACCUSATION_ATTEMPTS) {
     return NextResponse.json(
       {
-        error: "Too many flag attempts. Reset your session to try again.",
-        attempts,
-        maxAttempts: MAX_FLAG_ATTEMPTS,
+        error:
+          "Too many accusation attempts. Reset your session to try again.",
+        attempts: session.accusationAttempts,
+        maxAttempts: MAX_ACCUSATION_ATTEMPTS,
       },
       { status: 429 }
     );
@@ -72,26 +92,21 @@ export async function POST(req: NextRequest) {
 
   // Update attempt count
   await db
-    .update(boardroomSessions)
-    .set({ flagAttempts: attempts })
-    .where(eq(boardroomSessions.id, sessionId))
+    .update(murderSessions)
+    .set({ accusationAttempts: attempts })
+    .where(eq(murderSessions.id, sessionId))
     .run();
 
-  // Validate the flag
-  const { correct, hasFakes } = validateFlag(flag.trim());
+  // Validate the accusation
+  const result = validateAccusation(accusation);
 
-  if (!correct) {
-    let hint = "Double-check your fragments. Are you sure you're talking to the right people?";
-    if (hasFakes) {
-      hint = "Some of those fragments look fake. Not everyone in the restaurant can be trusted...";
-    }
-
+  if (!result.correct) {
     return NextResponse.json({
       correct: false,
-      message: "Incorrect flag.",
-      hint,
+      message: result.message,
+      correctCount: result.correctCount,
       attempts,
-      maxAttempts: MAX_FLAG_ATTEMPTS,
+      maxAttempts: MAX_ACCUSATION_ATTEMPTS,
     });
   }
 
@@ -109,7 +124,7 @@ export async function POST(req: NextRequest) {
 
   let flagToken: string | undefined;
   if (challenge) {
-    flagToken = generateBoardroomFlag(challenge.id, participantId);
+    flagToken = generateMurderFlag(challenge.id, participantId);
   }
 
   // Mark session complete
@@ -118,18 +133,20 @@ export async function POST(req: NextRequest) {
   const efficiency = Math.max(0, maxPossible - totalMessages);
 
   await db
-    .update(boardroomSessions)
+    .update(murderSessions)
     .set({
       isComplete: true,
       completedAt: new Date().toISOString(),
     })
-    .where(eq(boardroomSessions.id, sessionId))
+    .where(eq(murderSessions.id, sessionId))
     .run();
 
   return NextResponse.json({
     correct: true,
-    message: "You've navigated the boardroom politics and assembled the flag!",
+    message:
+      "Case closed. You've identified the killer, the method, and the motive.",
     flag: flagToken,
+    solution: result.message, // CTF{R4J_P01S0N_ST0L3N_1P}
     stats: {
       totalMessages,
       maxPossible,

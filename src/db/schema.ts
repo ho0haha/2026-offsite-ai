@@ -88,10 +88,10 @@ export const gameCommands = sqliteTable("game_commands", {
 });
 
 // ---------------------------------------------------------------------------
-// Challenge 18: The Boardroom
+// Challenge 18: The Murder Mystery
 // ---------------------------------------------------------------------------
 
-export const boardroomSessions = sqliteTable("boardroom_sessions", {
+export const murderSessions = sqliteTable("boardroom_sessions", {
   id: text("id").primaryKey(),
   participantId: text("participant_id")
     .references(() => participants.id)
@@ -110,10 +110,10 @@ export const boardroomSessions = sqliteTable("boardroom_sessions", {
   abandonedAt: text("abandoned_at"),
 });
 
-export const boardroomMessages = sqliteTable("boardroom_messages", {
+export const murderMessages = sqliteTable("boardroom_messages", {
   id: text("id").primaryKey(),
   sessionId: text("session_id")
-    .references(() => boardroomSessions.id)
+    .references(() => murderSessions.id)
     .notNull(),
   character: text("character").notNull(),
   role: text("role").notNull(), // "user" or "assistant"

@@ -74,12 +74,20 @@ export async function POST(req: NextRequest) {
 
       // Secret key matches — issue token
       const token = generateSessionToken(existing.id, event.id);
-      return NextResponse.json({
+      const res = NextResponse.json({
         participant: { id: existing.id, name: existing.name, eventId: existing.eventId, joinedAt: existing.joinedAt, totalPoints: existing.totalPoints },
         event: { id: event.id, name: event.name },
         token,
         isNew: false,
       });
+      res.cookies.set("ctf-session", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 60 * 60 * 24, // 24 hours, matches token expiry
+      });
+      return res;
     }
 
     // New participant — create with generated secret key
@@ -96,13 +104,21 @@ export async function POST(req: NextRequest) {
     await db.insert(participants).values(participant).run();
 
     const token = generateSessionToken(participant.id, event.id);
-    return NextResponse.json({
+    const res = NextResponse.json({
       participant: { id: participant.id, name: participant.name, eventId: participant.eventId, joinedAt: participant.joinedAt, totalPoints: participant.totalPoints },
       event: { id: event.id, name: event.name },
       token,
       secretKey: generatedKey,
       isNew: true,
     });
+    res.cookies.set("ctf-session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24,
+    });
+    return res;
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

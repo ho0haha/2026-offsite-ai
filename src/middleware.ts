@@ -90,7 +90,7 @@ export async function middleware(req: NextRequest) {
   // unauthenticated JS bundle exposure. The login form itself is acceptable.
 
   // Protect /challenges and /prison — require valid session token cookie or header
-  if (pathname === "/challenges" || pathname.startsWith("/prison")) {
+  if (pathname === "/challenges" || pathname === "/leaderboard" || pathname.startsWith("/prison")) {
     const token =
       req.cookies.get("ctf-session")?.value ??
       req.headers.get("authorization")?.replace("Bearer ", "");
@@ -108,10 +108,12 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/challenges",
+    "/leaderboard",
     "/prison/:path*",
     "/api/:path*",
     // Catch path normalization bypass attempts
     "/./challenges",
+    "/./leaderboard",
     "/./prison/:path*",
     "/./admin/:path*",
   ],

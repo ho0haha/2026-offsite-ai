@@ -298,11 +298,11 @@ const challenges = [
   {
     title: "The Gauntlet Sprint",
     description:
-      "10 independent mini-challenges spanning async bugs, SQL optimization, regex, custom sorting, rate limiting, log parsing, memory leaks, LRU caches, schema migrations, and stream processing. Complete 8 out of 10 to get the flag.\n\nYour task:\n1. Explore the gauntlet/ directory — each subfolder (01_async through 10_stream) is a self-contained challenge\n2. Read each challenge's README and test file to understand the task\n3. Implement or fix the solution in each subfolder\n4. Run: python run_gauntlet.py to test all 10 and see your score\n5. Flag printed when 8 or more challenges pass",
+      "10 independent mini-challenges spanning async bugs, SQL optimization, regex, custom sorting, rate limiting, log parsing, memory leaks, LRU caches, schema migrations, and stream processing. Complete 9 out of 10 to get the flag.\n\nYour task:\n1. Explore the gauntlet/ directory — each subfolder (01_async through 10_stream) is a self-contained challenge\n2. Read each challenge's README and test file to understand the task\n3. Implement or fix the solution in each subfolder\n4. Run: python run_gauntlet.py to test all 10 and see your score\n5. Flag printed when 9 or more challenges pass",
     category: "breadth-sprint",
     difficulty: "hard",
     points: 1000,
-    flag: "CTF{gauntlet_sprint_8_of_10_complete}",
+    flag: "CTF{gauntlet_sprint_9_of_10_complete}",
     hints: [
       { text: "Start with the challenges that play to your strengths — you only need 8 of 10", cost: 150 },
       { text: "Each challenge is independent — skip one that's taking too long and come back later", cost: 300 },
@@ -419,7 +419,9 @@ async function main() {
         modem_activated INTEGER DEFAULT 0,
         nuked_at TEXT,
         nuked_by TEXT,
-        nukes_launched INTEGER DEFAULT 0
+        nukes_launched INTEGER DEFAULT 0,
+        wopr_disconnects INTEGER DEFAULT 0,
+        disk_wiped INTEGER DEFAULT 0
       )`,
       `CREATE TABLE IF NOT EXISTS challenges (
         id TEXT PRIMARY KEY,

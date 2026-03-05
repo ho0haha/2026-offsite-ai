@@ -1,7 +1,7 @@
 {
   "1": {
     "dir": "01-hello-ai",
-    "include": ["README.md", "requirements.txt", "starter.py", "ctf_helper.py"]
+    "include": ["README.md", "requirements.txt", "starter.py", "test_solution.py", "ctf_helper.py"]
   },
   "2": {
     "dir": "02-bug-squash",

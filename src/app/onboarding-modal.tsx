@@ -14,7 +14,7 @@ type Props = {
   onComplete: () => void;
 };
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 
 export default function OnboardingModal({ data, onComplete }: Props) {
   const [step, setStep] = useState(0);
@@ -56,15 +56,16 @@ export default function OnboardingModal({ data, onComplete }: Props) {
         </div>
 
         {/* Card */}
-        <div className="bg-card border border-border rounded-xl p-8 min-h-[480px] flex flex-col">
+        <div className="bg-card border border-border rounded-xl p-8 max-h-[80vh] flex flex-col">
           {/* Step content */}
-          <div className="flex-1">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {step === 0 && <StepSecretKey secretKey={data.key} copied={copied} onCopy={handleCopy} />}
-            {step === 1 && <StepSetup />}
-            {step === 2 && <StepTierSystem />}
-            {step === 3 && <StepChallengeWorkflow />}
-            {step === 4 && <StepHowToSubmit />}
-            {step === 5 && <StepReady />}
+            {step === 1 && <StepEnvSetup />}
+            {step === 2 && <StepSetup />}
+            {step === 3 && <StepTierSystem />}
+            {step === 4 && <StepChallengeWorkflow />}
+            {step === 5 && <StepHowToSubmit />}
+            {step === 6 && <StepReady />}
           </div>
 
           {/* Navigation */}
@@ -94,7 +95,7 @@ export default function OnboardingModal({ data, onComplete }: Props) {
                   Next
                 </button>
               )}
-              {step > 0 && step < TOTAL_STEPS - 1 && (
+              {step >= 1 && step < TOTAL_STEPS - 1 && (
                 <button
                   onClick={next}
                   className="px-6 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
@@ -128,45 +129,24 @@ function StepSecretKey({
   copied: boolean;
   onCopy: () => void;
 }) {
-  const [serverUrl, setServerUrl] = useState("");
-  const [envCopied, setEnvCopied] = useState(false);
-
-  useEffect(() => {
-    setServerUrl(window.location.origin);
-  }, []);
-
-  const envBlock = `CTF_SERVER=${serverUrl}
-CTF_JOIN_CODE=YUMCTF`;
-
-  async function handleCopyEnv() {
-    try {
-      await navigator.clipboard.writeText(envBlock);
-      setEnvCopied(true);
-      setTimeout(() => setEnvCopied(false), 2000);
-    } catch {
-      /* fallback: user can manually select */
-    }
-  }
-
   return (
     <div className="space-y-5">
       <div className="text-center">
-        <div className="text-4xl mb-3">&#x1f511;</div>
+        <div className="text-4xl mb-3 font-mono text-primary">{">"}_</div>
         <h2 className="text-2xl font-bold tracking-tight">
-          Welcome to the <span className="text-primary">AI Coding CTF</span>
+          Access <span className="text-primary">Granted</span>
         </h2>
         <p className="mt-2 text-muted-foreground">
-          Your account has been created. Save your secret key and set up your environment.
+          You&apos;re in. Save your secret key — it&apos;s your only way back if you lose your session.
         </p>
       </div>
 
-      {/* Secret Key */}
       <div className="bg-card border-2 border-primary/50 rounded-lg p-5 space-y-3">
         <p className="text-sm font-medium text-center text-muted-foreground">
           Your Secret Key
         </p>
         <p className="text-xs text-center text-muted-foreground">
-          This is your login credential. You&apos;ll need it to log back in if you close your browser.
+          Lose this and you&apos;re locked out. No resets. No recovery.
         </p>
         <div className="bg-background border border-input rounded-md p-3 text-center">
           <code className="text-2xl font-mono tracking-widest text-primary select-all">
@@ -194,20 +174,54 @@ CTF_JOIN_CODE=YUMCTF`;
           )}
         </button>
         <div className="bg-destructive/10 border border-destructive/30 rounded-md p-2">
-          <p className="text-xs text-destructive font-medium text-center">
-            Save this key now! It will not be shown again.
+          <p className="text-xs text-destructive font-medium text-center font-mono">
+            [WARN] This key is shown exactly once.
           </p>
         </div>
       </div>
 
-      {/* Environment Setup */}
-      <div className="bg-card border border-border rounded-lg p-5 space-y-3">
-        <p className="text-sm font-medium text-center text-muted-foreground">
-          Environment File
+      <p className="text-xs text-center text-muted-foreground">
+        Copy your key to continue.
+      </p>
+    </div>
+  );
+}
+
+/* ─── Step 1: Environment File ─── */
+function StepEnvSetup() {
+  const [serverUrl, setServerUrl] = useState("");
+  const [envCopied, setEnvCopied] = useState(false);
+
+  useEffect(() => {
+    setServerUrl(window.location.origin);
+  }, []);
+
+  const envBlock = `CTF_SERVER=${serverUrl}\nCTF_JOIN_CODE=YUMCTF`;
+
+  async function handleCopyEnv() {
+    try {
+      await navigator.clipboard.writeText(envBlock);
+      setEnvCopied(true);
+      setTimeout(() => setEnvCopied(false), 2000);
+    } catch {
+      /* fallback: user can manually select */
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="text-center">
+        <div className="text-4xl mb-3 font-mono text-primary">$_</div>
+        <h2 className="text-2xl font-bold tracking-tight">Connect to the Server</h2>
+        <p className="mt-2 text-muted-foreground">
+          Drop these into a <code className="text-primary">.env</code> file in your working directory.
+          The included <code className="text-primary">ctf_helper.py</code> uses them to phone home.
         </p>
-        <p className="text-xs text-center text-muted-foreground">
-          Create a <code className="text-primary">.env</code> file in your working directory with these values.
-          The auto-submit helper (<code className="text-primary">ctf_helper.py</code>) uses them to connect to the CTF server.
+      </div>
+
+      <div className="bg-card border border-border rounded-lg p-5 space-y-3">
+        <p className="text-sm font-medium text-center text-muted-foreground font-mono">
+          .env
         </p>
         <div className="bg-background border border-input rounded-md p-3">
           <pre className="text-sm font-mono text-muted-foreground select-all whitespace-pre leading-relaxed"><span className="text-cyan-400">CTF_SERVER</span>={serverUrl}{"\n"}<span className="text-cyan-400">CTF_JOIN_CODE</span>=YUMCTF</pre>
@@ -234,22 +248,24 @@ CTF_JOIN_CODE=YUMCTF`;
         </button>
       </div>
 
-      <p className="text-xs text-center text-muted-foreground">
-        Copy your key to continue.
-      </p>
+      <div className="bg-muted/50 border border-border rounded-md p-3">
+        <p className="text-xs text-muted-foreground">
+          <strong className="text-foreground font-mono">[i]</strong> <code className="text-primary">ctf_helper.py</code> ships with your first challenge download. It handles auto-submission.
+        </p>
+      </div>
     </div>
   );
 }
 
-/* ─── Step 1: Setup Instructions ─── */
+/* ─── Step 2: Setup Instructions ─── */
 function StepSetup() {
   return (
     <div className="space-y-5">
       <div className="text-center">
-        <div className="text-4xl mb-3">&#x1f4bb;</div>
-        <h2 className="text-2xl font-bold tracking-tight">Environment Setup</h2>
+        <div className="text-4xl mb-3 font-mono text-primary">~/</div>
+        <h2 className="text-2xl font-bold tracking-tight">Gear Up</h2>
         <p className="mt-2 text-muted-foreground">
-          Everything you need is built into the challenge platform.
+          Three things between you and the first flag.
         </p>
       </div>
 
@@ -257,13 +273,13 @@ function StepSetup() {
         <SetupStep
           num={1}
           title="Prerequisites"
-          description="Make sure you have Python 3.11+ and pip installed. You'll also need an AI coding assistant (Cursor, Claude Code, GitHub Copilot, etc.)."
+          description="Python 3.11+ and pip. Plus an AI coding assistant — Cursor, Claude Code, GitHub Copilot, whatever you've got."
         />
 
         <SetupStep
           num={2}
           title="Download Starter Code"
-          description="Each challenge that requires code has a download button on its card. Click it to get a ZIP with everything you need — README, starter files, requirements, and a test suite."
+          description="Each challenge card has a download button. One click gives you a ZIP with everything — README, starter files, requirements, and tests."
         />
 
         <SetupStep
@@ -271,7 +287,7 @@ function StepSetup() {
           title="Install & Solve"
         >
           <p className="text-sm text-muted-foreground mt-1">
-            Unzip, then for each challenge:
+            Unzip, then:
           </p>
           <code className="block bg-background border border-input rounded-md p-3 text-sm font-mono text-muted-foreground mt-2 select-all overflow-x-auto">
             cd challenge-folder
@@ -279,7 +295,7 @@ function StepSetup() {
             pip install -r requirements.txt
           </code>
           <p className="text-sm text-muted-foreground mt-2">
-            Read the included <code className="text-primary">README.md</code>, solve the challenge, and submit your flag through this platform.
+            Read the <code className="text-primary">README.md</code>, solve it, submit the flag.
           </p>
         </SetupStep>
 
@@ -330,10 +346,10 @@ function StepTierSystem() {
   return (
     <div className="space-y-5">
       <div className="text-center">
-        <div className="text-4xl mb-3">&#x1f3c6;</div>
-        <h2 className="text-2xl font-bold tracking-tight">The Tier System</h2>
+        <div className="text-4xl mb-3 font-mono text-primary">{"//"} RANKS</div>
+        <h2 className="text-2xl font-bold tracking-tight">Climb the Tiers</h2>
         <p className="mt-2 text-muted-foreground">
-          Challenges are organized into 7 tiers. Solve challenges to unlock higher tiers.
+          7 tiers. Solve challenges to unlock the next. How high can you get?
         </p>
       </div>
 
@@ -359,13 +375,13 @@ function StepTierSystem() {
 
       <div className="bg-muted/50 border border-border rounded-md p-3 space-y-2">
         <p className="text-xs text-muted-foreground">
-          <strong className="text-foreground">Tip:</strong> You don&apos;t need to complete every challenge in a tier to progress — tiers 3–6 only require 2 solves from the tier below. Focus on the challenges that play to your strengths.
+          <strong className="text-foreground font-mono">[i]</strong> You don&apos;t need to clear every challenge — tiers 3-6 only require 2 solves from the tier below. Play to your strengths.
         </p>
         <p className="text-xs text-muted-foreground">
-          <strong className="text-foreground">Speed bonus:</strong> The first 3 solvers of each challenge earn bonus points — 1st gets +30%, 2nd gets +20%, 3rd gets +10%. Solve fast to maximize your score!
+          <strong className="text-foreground font-mono">[+]</strong> First 3 solvers of each challenge earn speed bonuses: +30%, +20%, +10%. Be fast, get rewarded.
         </p>
         <p className="text-xs text-muted-foreground">
-          <strong className="text-foreground">Hints:</strong> Tier 4+ challenges have optional hints that cost points (-100 to -500 each). Tiers 1–3 have no hints — you&apos;re on your own!
+          <strong className="text-foreground font-mono">[?]</strong> Tier 4+ challenges have hints you can decrypt — but they cost points. Tiers 1-3? You&apos;re on your own.
         </p>
       </div>
     </div>
@@ -377,10 +393,10 @@ function StepChallengeWorkflow() {
   return (
     <div className="space-y-5">
       <div className="text-center">
-        <div className="text-4xl mb-3">&#x1f9e9;</div>
-        <h2 className="text-2xl font-bold tracking-tight">How Challenges Work</h2>
+        <div className="text-4xl mb-3 font-mono text-primary">{"{"}&hellip;{"}"}</div>
+        <h2 className="text-2xl font-bold tracking-tight">The Mission Loop</h2>
         <p className="mt-2 text-muted-foreground">
-          Each challenge is a self-contained coding problem. Here&apos;s the flow.
+          Download. Solve. Submit. Repeat.
         </p>
       </div>
 
@@ -388,25 +404,25 @@ function StepChallengeWorkflow() {
         <WorkflowItem
           icon={<FolderIcon />}
           title="Challenge Directories"
-          description="Each challenge lives in its own numbered folder (01-hello-ai, 02-bug-squash, etc.) with its own README and requirements.txt."
+          description="Each challenge is self-contained — its own folder, its own README, its own dependencies."
         />
 
         <WorkflowItem
           icon={<DownloadIcon />}
           title="Starter Code"
-          description="Challenges that require code have a download button on their card. The ZIP includes everything: README, starter files, requirements.txt, and tests."
+          description="Hit the download button on any challenge card. The ZIP has everything you need."
         />
 
         <WorkflowItem
           icon={<TerminalIcon />}
           title="Solve & Submit"
-          description="Read the challenge README, install its dependencies (pip install -r requirements.txt), solve it, and submit your flag through this platform. Some challenges auto-submit when tests pass."
+          description="pip install, solve, submit the flag. Some challenges auto-submit when tests pass — you'll know."
         />
 
         <WorkflowItem
           icon={<AIIcon />}
           title="AI Assistants Encouraged"
-          description="This is an AI coding challenge — you're expected to use AI tools! Cursor, Claude Code, GitHub Copilot, or any other AI assistant is fair game."
+          description="This is an AI coding challenge — using AI tools isn't just allowed, it's the point. Go wild."
         />
       </div>
     </div>
@@ -440,10 +456,10 @@ function StepHowToSubmit() {
   return (
     <div className="space-y-5">
       <div className="text-center">
-        <div className="text-4xl mb-3">&#x1f4e4;</div>
-        <h2 className="text-2xl font-bold tracking-tight">How to Submit Answers</h2>
+        <div className="text-4xl mb-3 font-mono text-primary">{">>>"}</div>
+        <h2 className="text-2xl font-bold tracking-tight">Submission Modes</h2>
         <p className="mt-2 text-muted-foreground">
-          There are three types of challenges with different submission methods.
+          Three ways flags get captured. Know the difference.
         </p>
       </div>
 
@@ -455,11 +471,11 @@ function StepHowToSubmit() {
           color="text-cyan-400"
           bg="bg-cyan-500/10"
           border="border-cyan-500/30"
-          description="Most challenges produce a flag when you solve them (e.g., the test suite prints it when all tests pass)."
+          description="Solve it, get a flag in your terminal. Paste it into the challenge card."
           steps={[
-            "Solve the challenge locally — the flag appears in the terminal output",
-            <>Copy the flag (looks like <code className="text-cyan-400 text-xs">FLAG&#123;...&#125;</code> or <code className="text-cyan-400 text-xs">CTF&#123;...&#125;</code>)</>,
-            "Paste it into the submission box on the challenge card and hit Submit",
+            "Solve the challenge — the flag prints to your terminal",
+            <>Grab the flag (looks like <code className="text-cyan-400 text-xs">FLAG&#123;...&#125;</code> or <code className="text-cyan-400 text-xs">CTF&#123;...&#125;</code>)</>,
+            "Paste it into the challenge card, hit Submit",
           ]}
         />
 
@@ -470,11 +486,11 @@ function StepHowToSubmit() {
           color="text-green-400"
           bg="bg-green-500/10"
           border="border-green-500/30"
-          description="Some challenges validate your code files on the server. The test harness submits automatically when you pass."
+          description="Some challenges upload and validate your code server-side. Tests pass, flag lands automatically."
           steps={[
-            <>Run the validation script (e.g., <code className="text-green-400 text-xs">bash run.sh</code> or <code className="text-green-400 text-xs">python -m pytest</code>)</>,
-            <>The included <code className="text-green-400 text-xs">ctf_helper.py</code> auto-submits your files to the server</>,
-            "If auto-submit fails, a backup token is printed — paste it into the challenge card",
+            <>Run the validation script (<code className="text-green-400 text-xs">bash run.sh</code> or <code className="text-green-400 text-xs">python -m pytest</code>)</>,
+            <><code className="text-green-400 text-xs">ctf_helper.py</code> handles the submission for you</>,
+            "If auto-submit fails, a fallback token is printed — paste it manually",
           ]}
         />
 
@@ -485,35 +501,35 @@ function StepHowToSubmit() {
           color="text-amber-400"
           bg="bg-amber-500/10"
           border="border-amber-500/30"
-          description="A few challenges (like the murder mystery and the escape room) are played entirely in the browser. No local files needed."
+          description="A few challenges run live on the server — murder mystery, escape room. No local files."
           steps={[
-            "Click the Play button on the challenge card",
-            "Interact with the challenge through the built-in interface",
-            "Completion is detected automatically — no manual flag entry required",
+            "Hit Play on the challenge card",
+            "Interact through the built-in interface or API",
+            "Flag is captured automatically on completion",
           ]}
         />
 
         {/* Important notes */}
         <div className="bg-muted/50 border border-border rounded-md p-3 space-y-2">
           <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Key point:</strong> Every challenge tells you how to submit in its README or description. When in doubt, look for a <code className="text-primary text-xs">FLAG&#123;...&#125;</code> or <code className="text-primary text-xs">CTF&#123;...&#125;</code> string in your terminal output — that&apos;s your answer.
+            <strong className="text-foreground font-mono">[i]</strong> When in doubt, look for <code className="text-primary text-xs">FLAG&#123;...&#125;</code> or <code className="text-primary text-xs">CTF&#123;...&#125;</code> in your terminal output. That&apos;s your answer.
           </p>
           <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Prefer the web UI:</strong> You never need to call submission APIs directly. Everything goes through the challenge cards or the included <code className="text-primary text-xs">ctf_helper.py</code> auto-submitter.
+            <strong className="text-foreground font-mono">[i]</strong> You never need to call APIs directly. The challenge cards and <code className="text-primary text-xs">ctf_helper.py</code> handle everything.
           </p>
         </div>
 
         {/* API reference for manual/advanced users */}
         <div className="bg-muted/50 border border-border rounded-md p-3 space-y-2">
-          <p className="text-xs font-bold text-foreground uppercase tracking-wider">Advanced: Manual API Submission</p>
+          <p className="text-xs font-bold text-foreground uppercase tracking-wider font-mono">// Advanced: API Access</p>
           <p className="text-xs text-muted-foreground">
-            If your AI tool or workflow needs to submit programmatically, all API calls require an auth header:
+            For programmatic submission, all API calls require:
           </p>
           <code className="block bg-background border border-input rounded-md p-2 text-[11px] font-mono text-muted-foreground select-all overflow-x-auto">
             Authorization: Bearer &lt;your-session-token&gt;
           </code>
           <p className="text-xs text-muted-foreground">
-            Your session token is returned when you join (POST <code className="text-primary text-xs">/api/join</code>). Key endpoints:
+            Token returned on join. Key endpoints:
           </p>
           <div className="space-y-1 text-[11px] font-mono text-muted-foreground">
             <p><span className="text-cyan-400">POST</span> /api/submit <span className="text-muted-foreground/60">— submit a flag</span></p>
@@ -570,56 +586,54 @@ function StepReady() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <div className="text-4xl mb-3">&#x1f680;</div>
-        <h2 className="text-2xl font-bold tracking-tight">You&apos;re All Set!</h2>
+        <div className="text-4xl mb-3 font-mono text-primary">{"[READY]"}</div>
+        <h2 className="text-2xl font-bold tracking-tight">Systems Online</h2>
         <p className="mt-2 text-muted-foreground">
-          Here&apos;s a quick reference to keep handy.
+          Quick reference before you drop in.
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <QuickRefCard
-          title="Scoring"
+          title="// Scoring"
           items={[
-            "Higher tiers = more points",
-            "50–1,000 pts per challenge",
-            "No penalty for wrong guesses — swing big",
-            "Tier 4+ hints cost points (-100 to -500)",
-            "Speed bonus: 1st solve +30%, 2nd +20%, 3rd +10%",
+            "Higher tiers = more points (50-2,000)",
+            "No penalty for wrong flags — swing big",
+            "Speed bonus: 1st +30%, 2nd +20%, 3rd +10%",
+            "Hints cost points (-100 to -500)",
           ]}
         />
         <QuickRefCard
-          title="Strategy"
+          title="// Strategy"
           items={[
-            "Tier 1 warm-ups go fast — knock them out",
-            "Read the README — every clue matters",
+            "Crush the Tier 1 warm-ups first",
+            "Read the README — every word matters",
             "Lean on your AI assistant hard",
             "Speed bonuses reward the bold",
           ]}
         />
         <QuickRefCard
-          title="Per Challenge"
+          title="// Per Challenge"
           items={[
             "Download ZIP from challenge card",
             "pip install -r requirements.txt",
-            "Read the README.md",
-            "Solve, test, submit flag",
+            "Read README.md, solve, submit flag",
           ]}
         />
         <QuickRefCard
-          title="Remember"
+          title="// Remember"
           items={[
             "Everything you need is in the ZIP",
             "Some challenges auto-submit on solve",
-            "Tier 7 is the summit — claim it",
             "Not every challenge requires code...",
+            "Tier 7 is the summit — claim it first",
           ]}
         />
       </div>
 
       <div className="bg-primary/10 border border-primary/30 rounded-md p-4 text-center space-y-2">
-        <p className="text-sm font-medium text-primary">
-          7 tiers. 20 challenges. One leaderboard. Let&apos;s see what you&apos;ve got.
+        <p className="text-sm font-medium text-primary font-mono">
+          7 tiers &middot; 20 challenges &middot; 1 leaderboard
         </p>
         <p className="text-xs text-muted-foreground">
           Tier 7 isn&apos;t just the end — it&apos;s where the curious get rewarded.

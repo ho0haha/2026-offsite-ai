@@ -3,6 +3,8 @@ import { validateCh5 } from "./ch5";
 import { validateCh7 } from "./ch7";
 import { validateCh9 } from "./ch9";
 import { validateCh11 } from "./ch11";
+import { validateCh15 } from "./ch15";
+import { validateCh16 } from "./ch16";
 import { stubDiffCheck } from "./stub-check";
 
 type ValidationResult = { valid: boolean; details: string[] };
@@ -14,6 +16,8 @@ const tier1Validators: Record<number, (files: Map<string, string>) => Validation
   7: validateCh7,
   9: validateCh9,
   11: validateCh11,
+  15: validateCh15,
+  16: validateCh16,
 };
 
 /**

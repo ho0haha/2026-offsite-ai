@@ -8,6 +8,7 @@ import { generateToken } from "@/lib/crypto";
 import { requireAuth } from "@/lib/auth";
 import { getParticipantTierStatus, getNewlyUnlockedChallenges } from "@/lib/tiers";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { hasEnoughLlmCalls, MIN_LLM_CALLS } from "@/lib/llm-usage";
 
 export async function POST(req: NextRequest) {
   try {
@@ -86,6 +87,14 @@ export async function POST(req: NextRequest) {
     }
 
     const previousMaxTier = tierStatus.maxTier;
+
+    // LLM-dependent challenges require actual LLM proxy usage
+    if (!hasEnoughLlmCalls(participantId, challengeNumber)) {
+      return NextResponse.json({
+        valid: false,
+        message: `This challenge requires using the LLM proxy (ctf_helper.ask_llm). Make at least ${MIN_LLM_CALLS} LLM calls before submitting.`,
+      });
+    }
 
     const validationType = challenge.validationType || "flag";
     if (validationType === "flag") {

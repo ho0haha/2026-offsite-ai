@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireAuth } from "@/lib/auth";
 import { getParticipantTierStatus } from "@/lib/tiers";
+import { recordLlmCall } from "@/lib/llm-usage";
 
 // In-memory rate limiter per participant
 const rateLimitMap = new Map<string, number>();
@@ -98,6 +99,8 @@ export async function POST(req: NextRequest) {
 
     const content =
       result.content[0].type === "text" ? result.content[0].text : "";
+
+    recordLlmCall(participantId);
 
     return NextResponse.json({ content });
   } catch {

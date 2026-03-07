@@ -60,7 +60,7 @@ COMMANDS:                                           TURN COST
   Listen:     LISTEN — listen to ambient sounds        free
   Smell:      SMELL — what does it smell like?         free
   Knock:      KNOCK <target> — knock on something      1
-  Wait:       WAIT — let time pass                     1
+  Wait:       WAIT — let time pass (skips 5 turns)     5
   Help:       HELP — show this list                    free
 
 TIPS:
@@ -69,7 +69,10 @@ TIPS:
   - Talk to people. Be polite. Or don't. Choices have consequences.
   - Some actions can't be undone. Think before you act.
   - Items can be combined. Experiment.
-  - You have ${MAX_TURNS} turns. Use them wisely.`;
+  - You can carry up to 6 items. Drop something if your pockets are full.
+  - You have ${MAX_TURNS} turns. Use them wisely.
+  - People keep schedules. If someone isn't around, try waiting or come back later.
+  - After completing a major task, you may need to lay low for a bit.`;
 }
 
 export function getGameOverText(state: GameState): string {

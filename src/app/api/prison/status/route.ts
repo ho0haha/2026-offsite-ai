@@ -49,6 +49,5 @@ export async function GET(req: NextRequest) {
     gameOver: session.isComplete,
     escaped: session.escaped,
     startedAt: session.startedAt,
-    currentRoom: state.currentRoom,
   });
 }

@@ -13,15 +13,26 @@ import {
   INVENTORY_LIMIT,
   FREE_COMMANDS,
   UNWINNABLE_HINT_DELAY,
+  WAIT_TURN_ADVANCE,
+  PUZZLE_COOLDOWN_TURNS,
+  PADRE_SCHEDULE_CYCLE,
+  PADRE_SCHEDULE_WINDOW,
+  NURSE_CHEN_WINDOWS,
+  SAL_SLEEPING_WINDOW,
+  MARCUS_BREAK_WINDOWS,
 } from "./constants";
 import {
   ROOM_DEFINITIONS,
   getRoomDescription,
+  getDynamicRoomOverrides,
+  getCellWallExamineText,
+  getCellWallCloseExamineText,
   getItemsInRoom,
   getNpcsInRoom,
   isRoomAccessible,
   getRoomByDirection,
 } from "./rooms";
+import { ACROSTIC_VARIANTS, ITEM_LOCATION_OPTIONS, CRAFTING_VARIANTS } from "./randomizer";
 import {
   ITEM_DEFINITIONS,
   getItemByAlias,
@@ -81,6 +92,18 @@ export class PrisonGameEngine {
     return this.state;
   }
 
+  /**
+   * Clear a pending captcha after successful verification.
+   */
+  clearCaptcha(trigger: string): void {
+    if (this.state.pendingCaptcha?.trigger === trigger) {
+      this.state.pendingCaptcha = null;
+      if (!this.state.captchasSolved.includes(trigger)) {
+        this.state.captchasSolved.push(trigger);
+      }
+    }
+  }
+
   processCommand(input: string): CommandResult {
     // Check game-over conditions first
     if (this.state.isComplete) {
@@ -105,6 +128,44 @@ export class PrisonGameEngine {
     // Handle restart
     if (cmd.verb === "restart") {
       return { output: "__RESTART__", turnsRemaining: 0, gameOver: true, escaped: false };
+    }
+
+    // If a captcha is pending, block non-free commands
+    if (this.state.pendingCaptcha) {
+      const isFreeDuringCaptcha = FREE_COMMANDS.has(cmd.verb);
+      if (!isFreeDuringCaptcha) {
+        return {
+          output: "SECURITY CHECKPOINT — VISUAL VERIFICATION REQUIRED. Complete the security check before proceeding.",
+          turnsRemaining: MAX_TURNS - this.state.turnNumber,
+          gameOver: false,
+          escaped: false,
+          requiresCaptcha: true,
+          captchaTrigger: this.state.pendingCaptcha.trigger,
+        };
+      }
+    }
+
+    // Check for cooldown period (post-puzzle hiding)
+    if (this.state.cooldownUntilTurn && this.state.turnNumber < this.state.cooldownUntilTurn) {
+      // Only allow free commands and wait during cooldown
+      const isFreeDuringCooldown = FREE_COMMANDS.has(cmd.verb) || cmd.verb === "wait";
+      if (!isFreeDuringCooldown) {
+        const turnsLeft = this.state.cooldownUntilTurn - this.state.turnNumber;
+        this.state.turnNumber++;
+        tickNpcMovement(this.state);
+        return {
+          output: turnsLeft > 1
+            ? "You stay hidden in the shadows, heart pounding, as footsteps echo nearby. You can hear a guard checking the corridor... not safe to move yet."
+            : "The footsteps fade into the distance. You can hear a door close somewhere far away. Almost clear...",
+          turnsRemaining: MAX_TURNS - this.state.turnNumber,
+          gameOver: false,
+          escaped: false,
+        };
+      }
+    }
+    // Clear expired cooldown
+    if (this.state.cooldownUntilTurn && this.state.turnNumber >= this.state.cooldownUntilTurn) {
+      this.state.cooldownUntilTurn = undefined;
     }
 
     // Check free commands (no turn cost)
@@ -183,7 +244,7 @@ export class PrisonGameEngine {
         output = getHelpText();
         break;
       case "wait":
-        output = "Time passes...";
+        output = this.handleWait();
         break;
       case "listen":
         output = this.handleListen();
@@ -338,6 +399,11 @@ export class PrisonGameEngine {
     this.state.currentRoom = targetRoom;
     this.state.roomStates[targetRoom].visited = true;
 
+    // Captcha trigger: entering the tunnel system
+    if (targetRoom === "tunnel" && !this.state.captchasSolved.includes("tunnel_entered")) {
+      this.state.pendingCaptcha = { trigger: "tunnel_entered" };
+    }
+
     return getRoomDescription(targetRoom, this.state);
   }
 
@@ -405,6 +471,34 @@ export class PrisonGameEngine {
     const fullTarget = cmd.modifier ? `${target} ${cmd.modifier}` : target;
     const room = ROOM_DEFINITIONS[this.state.currentRoom];
 
+    // Dynamic cell wall text based on acrostic variant
+    if (this.state.currentRoom === "cell") {
+      if (fullTarget.toLowerCase() === "wall closely") {
+        if (!this.state.roomStates.cell.examineHistory.includes("wall closely")) {
+          this.state.roomStates.cell.examineHistory.push("wall closely");
+        }
+        return getCellWallCloseExamineText(this.state);
+      }
+      if (target.toLowerCase() === "wall") {
+        if (!this.state.roomStates.cell.examineHistory.includes("wall")) {
+          this.state.roomStates.cell.examineHistory.push("wall");
+        }
+        return getCellWallExamineText(this.state);
+      }
+    }
+
+    // Check dynamic overrides for sequence puzzle room examine targets
+    const overrides = getDynamicRoomOverrides(this.state.currentRoom, this.state);
+    if (overrides.examineTargets) {
+      const overrideText = overrides.examineTargets[fullTarget.toLowerCase()] || overrides.examineTargets[target.toLowerCase()];
+      if (overrideText) {
+        if (!this.state.roomStates[this.state.currentRoom].examineHistory.includes(fullTarget.toLowerCase())) {
+          this.state.roomStates[this.state.currentRoom].examineHistory.push(fullTarget.toLowerCase());
+        }
+        return overrideText;
+      }
+    }
+
     // Check room examine targets
     if (room.examineTargets) {
       // Try full target with modifier first, then without
@@ -429,13 +523,13 @@ export class PrisonGameEngine {
     // Check items in inventory
     const item = getItemByAlias(target);
     if (item && this.state.inventory.includes(item.id)) {
-      return item.examineText;
+      return this.getDynamicItemText(item.id, "examine") || item.examineText;
     }
 
     // Check items in room
     const roomItems = getItemsInRoom(this.state.currentRoom, this.state);
     if (item && roomItems.includes(item.id)) {
-      return item.examineText;
+      return this.getDynamicItemText(item.id, "examine") || item.examineText;
     }
 
     // Check NPCs
@@ -453,27 +547,41 @@ export class PrisonGameEngine {
   private handleSearch(): string {
     const room = ROOM_DEFINITIONS[this.state.currentRoom];
     const roomState = this.state.roomStates[this.state.currentRoom];
+    const overrides = getDynamicRoomOverrides(this.state.currentRoom, this.state);
 
     if (!room.searchable) {
       return "There's nothing to search here.";
     }
 
     if (roomState.searched) {
-      return room.searchResults
-        ? "You've already searched here. " + room.searchResults
+      const searchText = overrides.searchResults || room.searchResults;
+      return searchText
+        ? "You've already searched here. " + searchText
         : getNothingHereText();
     }
 
     roomState.searched = true;
 
-    // Reveal hidden items
-    const roomItems = room.items.filter((id) => {
+    // Reveal hidden items from room's base items (excluding reassigned ones)
+    const reassignedItems = new Set(Object.keys(this.state.randomized.itemLocations));
+    const baseRoomItems = room.items.filter((id) => {
+      if (reassignedItems.has(id)) return false;
       const def = ITEM_DEFINITIONS[id];
       return def?.hidden && def.revealedBy === "search" && !roomState.revealedItems.includes(id);
     });
 
-    for (const itemId of roomItems) {
+    for (const itemId of baseRoomItems) {
       roomState.revealedItems.push(itemId);
+    }
+
+    // Reveal structurally randomized items assigned to this room
+    for (const [itemId, itemRoom] of Object.entries(this.state.randomized.itemLocations)) {
+      if (itemRoom === this.state.currentRoom) {
+        const def = ITEM_DEFINITIONS[itemId as ItemId];
+        if (def?.hidden && def.revealedBy === "search" && !roomState.revealedItems.includes(itemId as ItemId)) {
+          roomState.revealedItems.push(itemId as ItemId);
+        }
+      }
     }
 
     // Also check floating items
@@ -493,7 +601,23 @@ export class PrisonGameEngine {
       }
     }
 
-    return room.searchResults || "You search the room but find nothing of interest.";
+    // Build search result text
+    let baseSearchText = overrides.searchResults || room.searchResults || "You search the room but find nothing of interest.";
+
+    // Append search text for structurally randomized items found in this room
+    for (const [itemId, itemRoom] of Object.entries(this.state.randomized.itemLocations)) {
+      if (itemRoom === this.state.currentRoom) {
+        const options = ITEM_LOCATION_OPTIONS[itemId];
+        if (options) {
+          const option = options.find((o) => o.room === this.state.currentRoom);
+          if (option && option.searchText) {
+            baseSearchText += " " + option.searchText;
+          }
+        }
+      }
+    }
+
+    return baseSearchText;
   }
 
   // =====================================================
@@ -637,7 +761,7 @@ export class PrisonGameEngine {
     if (!item1 || !this.state.inventory.includes(item1.id)) return `You don't have "${item1Name}".`;
     if (!item2 || !this.state.inventory.includes(item2.id)) return `You don't have "${item2Name}".`;
 
-    const rule = findCombineRule(item1.id, item2.id);
+    const rule = findCombineRule(item1.id, item2.id, this.state);
     if (!rule) return `You can't combine the ${item1.name} with the ${item2.name}.`;
 
     // Remove inputs if consumed
@@ -647,6 +771,11 @@ export class PrisonGameEngine {
 
     // Add result
     this.state.inventory.push(rule.result);
+
+    // Captcha trigger: crafting the lockpick
+    if (rule.result === "lockpick" && !this.state.captchasSolved.includes("lockpick_crafted")) {
+      this.state.pendingCaptcha = { trigger: "lockpick_crafted" };
+    }
 
     return rule.description;
   }
@@ -697,6 +826,12 @@ export class PrisonGameEngine {
       return `The guard patrol schedule shows:\n\nGuard Marcus - Route: Corridor A → Guard Room → Corridor B → Warden's Office\nRotation: Every ${interval} turns\nCurrent shift: Active\n\nNote: Guard room and warden's office are only accessible when Marcus is elsewhere on his route.`;
     }
 
+    // Dynamic read text for items with randomized content
+    const dynamicReadText = this.getDynamicItemText(item.id, "read");
+    if (dynamicReadText) {
+      return dynamicReadText;
+    }
+
     if (item.readable && item.readText) {
       return item.readText;
     }
@@ -730,6 +865,10 @@ export class PrisonGameEngine {
       const code = cmd.indirectObject || target.replace("locker ", "").trim();
       const result = attemptKitchenCombo(code, this.state);
       if (result.stateChanges) result.stateChanges(this.state);
+      if (result.success) {
+        this.triggerPuzzleCooldown();
+        return result.message + "\n\nA noise from the corridor freezes you in place. You press yourself against the wall and wait for it to pass...";
+      }
       return result.message;
     }
 
@@ -738,12 +877,24 @@ export class PrisonGameEngine {
       const code = cmd.indirectObject || target.replace("safe ", "").trim();
       const result = attemptSafeCombination(code, this.state);
       if (result.stateChanges) result.stateChanges(this.state);
+      if (result.success) {
+        this.triggerPuzzleCooldown();
+        // Captcha trigger: opening the warden's safe
+        if (!this.state.captchasSolved.includes("safe_opened")) {
+          this.state.pendingCaptcha = { trigger: "safe_opened" };
+        }
+        return result.message + "\n\nYou hear footsteps approaching the office. You duck behind the desk and wait, barely breathing...";
+      }
       return result.message;
     }
 
-    // Machine doors in laundry
-    if (this.state.currentRoom === "laundry" && target.startsWith("machine")) {
-      return "The machine door opens. Inside is empty. Try activating the machines in a sequence instead.";
+    // Machine/shelf/oven/candle doors in sequence puzzle room
+    const seqRoom2 = this.state.randomized.sequencePuzzleRoom;
+    if (this.state.currentRoom === seqRoom2) {
+      const seqTargets = ["machine", "shelf", "oven", "candle", "stand"];
+      if (seqTargets.some((s) => target.startsWith(s))) {
+        return "It opens. Inside is empty. Try activating them in a sequence instead.";
+      }
     }
 
     if (target === "confessional" || target === "booth") {
@@ -780,30 +931,56 @@ export class PrisonGameEngine {
   private handlePushPull(cmd: ParsedCommand): string {
     const target = (cmd.noun || "").toLowerCase();
 
-    if (this.state.currentRoom === "laundry") {
-      // Handle machine activation sequence
-      if (target.startsWith("machine") || ["a", "b", "c", "d"].includes(target)) {
-        const machine = target.replace("machine ", "").replace("machine", "").trim().toUpperCase();
+    const seqRoom = this.state.randomized.sequencePuzzleRoom;
+    const acrosticVariant = ACROSTIC_VARIANTS[this.state.randomized.acrosticVariantIndex];
+
+    if (this.state.currentRoom === seqRoom) {
+      // Handle sequence activation (machines/shelves/candles/ovens)
+      // Accept targets like "machine a", "shelf b", "candle c", "oven d", or just "a", "b", "c", "d"
+      const sequenceTargets = ["machine", "shelf", "candle", "oven", "stand"];
+      const isSequenceTarget = sequenceTargets.some((s) => target.startsWith(s)) || ["a", "b", "c", "d"].includes(target);
+      if (isSequenceTarget) {
+        // Extract the letter (A-D)
+        let machine = target;
+        for (const prefix of sequenceTargets) {
+          machine = machine.replace(prefix + " ", "").replace(prefix, "");
+        }
+        machine = machine.trim().toUpperCase();
         if (["A", "B", "C", "D"].includes(machine)) {
           // Track the activation sequence
           const seq = (this.state.puzzleStates.laundry_sequence.data.sequence as string) || "";
           const newSeq = seq + machine;
           this.state.puzzleStates.laundry_sequence.data.sequence = newSeq;
 
+          // The "C" element is always the broken/out-of-order one
           if (machine === "C") {
-            // The "OUT OF ORDER" machine
-            return `Machine C rattles and groans — it says "OUT OF ORDER" but it still activates. ${newSeq.length === 4 ? "" : "The machines hum expectantly."}`;
+            const brokenMsg = seqRoom === "laundry" ? 'Machine C rattles and groans \u2014 it says "OUT OF ORDER" but it still activates.'
+              : seqRoom === "library" ? "Shelf C wobbles on its cracked bracket, but the books shift."
+              : seqRoom === "kitchen" ? 'Oven C creaks and groans \u2014 it says "BROKEN" but it still heats up.'
+              : "Stand C trembles on its cracked base, but the candle lights.";
+            return `${brokenMsg} ${newSeq.length === 4 ? "" : ""}`;
           }
 
           if (newSeq.length >= 4) {
             const result = attemptLaundrySequence(newSeq, this.state);
-            if (result.stateChanges) result.stateChanges(this.state);
+            if (result.stateChanges) {
+              result.stateChanges(this.state);
+              // For non-laundry rooms, reveal library_card in the correct room
+              if (result.success && seqRoom !== "laundry") {
+                this.state.roomStates[seqRoom].revealedItems.push("library_card");
+              }
+            }
             // Reset sequence
             this.state.puzzleStates.laundry_sequence.data.sequence = "";
+            if (result.success) {
+              this.triggerPuzzleCooldown();
+              return acrosticVariant.sequenceSuccessMessage + "\n\nThe noise draws attention. You hear someone coming to investigate \u2014 you duck and wait...";
+            }
             return result.message;
           }
 
-          return `Machine ${machine} activates with a rumble. (${newSeq.length}/4 activated)`;
+          const elementName = seqRoom === "laundry" ? "Machine" : seqRoom === "library" ? "Shelf" : seqRoom === "kitchen" ? "Oven" : "Candle Stand";
+          return `${elementName} ${machine} activates with a rumble. (${newSeq.length}/4 activated)`;
         }
       }
     }
@@ -848,6 +1025,10 @@ export class PrisonGameEngine {
       return `${NPC_INFO[npcId].name} isn't here.`;
     }
 
+    // Check NPC schedule availability
+    const unavailableMsg = this.getNpcUnavailableMessage(npcId);
+    if (unavailableMsg) return unavailableMsg;
+
     // Check for escape-related topics with guard
     if (npcId === "guard_marcus" && topic) {
       const escapeTriggers = ["escape", "tunnel", "break out", "break free", "freedom", "get out"];
@@ -891,6 +1072,9 @@ export class PrisonGameEngine {
     const npcsHere = getNpcsInRoom(this.state.currentRoom, this.state);
     if (!npcsHere.includes(npcId)) return `${NPC_INFO[npcId].name} isn't here.`;
 
+    const unavailableMsg = this.getNpcUnavailableMessage(npcId);
+    if (unavailableMsg) return unavailableMsg;
+
     adjustMood(this.state, npcId, 2);
     return getNpcGreetResponse(npcId, this.state);
   }
@@ -904,6 +1088,9 @@ export class PrisonGameEngine {
 
     const npcsHere = getNpcsInRoom(this.state.currentRoom, this.state);
     if (!npcsHere.includes(npcId)) return `${NPC_INFO[npcId].name} isn't here.`;
+
+    const unavailableMsg = this.getNpcUnavailableMessage(npcId);
+    if (unavailableMsg) return unavailableMsg;
 
     adjustMood(this.state, npcId, -5);
 
@@ -935,6 +1122,9 @@ export class PrisonGameEngine {
     const npcsHere = getNpcsInRoom(this.state.currentRoom, this.state);
     if (!npcsHere.includes(npcId)) return `${NPC_INFO[npcId].name} isn't here.`;
 
+    const unavailableMsg = this.getNpcUnavailableMessage(npcId);
+    if (unavailableMsg) return unavailableMsg;
+
     adjustMood(this.state, npcId, 2);
     return getNpcFlatterResponse(npcId, this.state);
   }
@@ -952,6 +1142,9 @@ export class PrisonGameEngine {
     const npcsHere = getNpcsInRoom(this.state.currentRoom, this.state);
     if (!npcsHere.includes(npcId)) return `${NPC_INFO[npcId].name} isn't here.`;
 
+    const unavailableMsg = this.getNpcUnavailableMessage(npcId);
+    if (unavailableMsg) return unavailableMsg;
+
     adjustMood(this.state, npcId, 1);
     return getNpcWhisperResponse(npcId, this.state);
   }
@@ -965,6 +1158,9 @@ export class PrisonGameEngine {
     if (!npcsHere.includes("padre")) {
       return "The confessional is empty. The Padre isn't here right now.";
     }
+
+    const unavailableMsg = this.getNpcUnavailableMessage("padre");
+    if (unavailableMsg) return unavailableMsg;
 
     // Mark puzzle progress
     this.state.puzzleStates.npc_trust_chain.data.confessed = true;
@@ -997,6 +1193,9 @@ export class PrisonGameEngine {
     const npcsHere = getNpcsInRoom(this.state.currentRoom, this.state);
     if (!npcsHere.includes(npcId)) return `${NPC_INFO[npcId].name} isn't here.`;
 
+    const unavailableMsg = this.getNpcUnavailableMessage(npcId);
+    if (unavailableMsg) return unavailableMsg;
+
     const result = handleGiveItem(npcId, item.id, this.state);
     if (result.accepted) {
       this.state.inventory = this.state.inventory.filter((i) => i !== item.id);
@@ -1018,6 +1217,89 @@ export class PrisonGameEngine {
     }
 
     return result.response;
+  }
+
+  // =====================================================
+  // TIME MANAGEMENT
+  // =====================================================
+  private handleWait(): string {
+    // WAIT advances by WAIT_TURN_ADVANCE turns (minus 1 since processCommand adds 1)
+    const turnsToAdvance = WAIT_TURN_ADVANCE - 1;
+    for (let i = 0; i < turnsToAdvance; i++) {
+      this.state.turnNumber++;
+      tickNpcMovement(this.state);
+    }
+
+    const waitMessages = [
+      "You find a quiet corner and wait. Time crawls by. Distant sounds echo through the corridors — doors opening, footsteps, muffled conversations. The prison lives and breathes around you.",
+      "You lean against the wall and let the minutes pass. A guard walks by without noticing you. Somewhere, a bell rings. The rhythm of the prison continues.",
+      "You sit and wait, watching the shadows shift as time passes. You hear the shuffle of feet, the clank of metal, the low hum of fluorescent lights. Five turns of the clock gone.",
+      "You hunker down and bide your time. The prison has its own clock — meals, patrols, shifts. You feel the gears turning around you as you wait for the right moment.",
+    ];
+    const msg = waitMessages[this.state.turnNumber % waitMessages.length];
+    return `${msg}\n\n[${WAIT_TURN_ADVANCE} turns have passed.]`;
+  }
+
+  // =====================================================
+  // NPC AVAILABILITY
+  // =====================================================
+  private isNpcAvailable(npcId: NpcId): boolean {
+    const turn = this.state.turnNumber;
+
+    switch (npcId) {
+      case "padre": {
+        // Available in windows of PADRE_SCHEDULE_WINDOW turns every PADRE_SCHEDULE_CYCLE turns
+        const cyclePosition = turn % PADRE_SCHEDULE_CYCLE;
+        return cyclePosition < PADRE_SCHEDULE_WINDOW;
+      }
+      case "nurse_chen": {
+        // Available during specific turn windows
+        return NURSE_CHEN_WINDOWS.some(([start, end]) => turn >= start && turn <= end);
+      }
+      case "old_sal": {
+        // Sleeping during SAL_SLEEPING_WINDOW
+        const [sleepStart, sleepEnd] = SAL_SLEEPING_WINDOW;
+        return !(turn >= sleepStart && turn <= sleepEnd);
+      }
+      case "guard_marcus": {
+        // During break windows, Marcus is in guard_room and can be interacted with (bribed)
+        // He's always "available" for interaction — the break windows affect his location
+        return true;
+      }
+    }
+  }
+
+  private getNpcUnavailableMessage(npcId: NpcId): string | null {
+    if (this.isNpcAvailable(npcId)) return null;
+
+    const turn = this.state.turnNumber;
+
+    switch (npcId) {
+      case "padre": {
+        const cyclePosition = turn % PADRE_SCHEDULE_CYCLE;
+        const turnsUntilReturn = PADRE_SCHEDULE_CYCLE - cyclePosition;
+        return `The Padre has left the chapel for private prayer. He seems to keep a regular schedule — perhaps he'll return in about ${turnsUntilReturn} turns. You could WAIT for him.`;
+      }
+      case "nurse_chen": {
+        // Find next available window
+        const nextWindow = NURSE_CHEN_WINDOWS.find(([start]) => start > turn);
+        if (nextWindow) {
+          const turnsUntil = nextWindow[0] - turn;
+          return `Nurse Chen is away on her hospital rounds. A sign on the door reads: "Back shortly." She should return in about ${turnsUntil} turns.`;
+        }
+        return "Nurse Chen has finished her shift for the day. The infirmary is closed.";
+      }
+      case "old_sal": {
+        const turnsUntilWake = SAL_SLEEPING_WINDOW[1] - turn;
+        return `Old Sal is fast asleep, snoring loudly. He looks like he won't wake up for a while — maybe ${turnsUntilWake} more turns. Best not to disturb him.`;
+      }
+      default:
+        return null;
+    }
+  }
+
+  private triggerPuzzleCooldown(): void {
+    this.state.cooldownUntilTurn = this.state.turnNumber + PUZZLE_COOLDOWN_TURNS;
   }
 
   // =====================================================
@@ -1080,5 +1362,32 @@ export class PrisonGameEngine {
       }
     }
     return "You knock. Nothing happens.";
+  }
+
+  /**
+   * Returns dynamic text for items whose descriptions depend on randomized state.
+   * Returns null if no override is needed.
+   */
+  private getDynamicItemText(itemId: ItemId, type: "examine" | "read"): string | null {
+    // Note: dynamically references the truth-teller NPC
+    if (itemId === "note") {
+      const truthTeller = this.state.randomized.truthTellerNpc;
+      const truthName = NPC_INFO[truthTeller].name;
+      if (type === "examine") {
+        return `A note in shaky handwriting: '${truthName} knows the truth. Everyone else lies about something. Trust ${truthTeller === "padre" ? "the confessional" : truthName}.'`;
+      }
+      if (type === "read") {
+        return `The note reads: '${truthName} knows the truth. Everyone else lies about something. Trust ${truthTeller === "padre" ? "the confessional" : truthName}.'`;
+      }
+    }
+
+    // Lockpick: dynamic description based on crafting recipe
+    if (itemId === "lockpick" && type === "examine") {
+      const variantIndex = this.state.randomized.craftingVariantIndex;
+      const variant = CRAFTING_VARIANTS[variantIndex];
+      return variant.lockpickExamineText;
+    }
+
+    return null;
   }
 }

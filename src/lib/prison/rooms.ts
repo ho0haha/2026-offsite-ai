@@ -1,4 +1,5 @@
-import type { RoomDefinition, RoomId, Direction, GameState } from "./types";
+import type { RoomDefinition, RoomId, Direction, GameState, ItemId } from "./types";
+import { ACROSTIC_VARIANTS, ITEM_LOCATION_OPTIONS } from "./randomizer";
 
 // Room map:
 //                       [gate] <- FINAL EXIT
@@ -389,6 +390,45 @@ export const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
 };
 
 /**
+ * Get dynamic overrides for room descriptions based on randomized state.
+ * Returns overrides for the sequence puzzle room and any item-location
+ * search results.
+ */
+export function getDynamicRoomOverrides(roomId: RoomId, state: GameState): {
+  description?: string;
+  searchResults?: string;
+  examineTargets?: Record<string, string>;
+} {
+  const variant = ACROSTIC_VARIANTS[state.randomized.acrosticVariantIndex];
+  const seqRoom = state.randomized.sequencePuzzleRoom;
+
+  // Override the sequence puzzle room
+  if (roomId === seqRoom && seqRoom !== "laundry") {
+    // For non-laundry sequence rooms, overlay the sequence elements
+    return {
+      description: variant.sequenceRoomDescription,
+      searchResults: variant.sequenceSearchResults,
+      examineTargets: variant.sequenceExamineTargets,
+    };
+  }
+
+  return {};
+}
+
+/**
+ * Get the cell wall examine text, using the randomized acrostic poem.
+ */
+export function getCellWallExamineText(state: GameState): string {
+  const variant = ACROSTIC_VARIANTS[state.randomized.acrosticVariantIndex];
+  return `The wall is covered in scratches and crude drawings. Among the mess, one section of graffiti stands out — it looks more deliberate, like a message:\n\n  ${variant.poem}`;
+}
+
+export function getCellWallCloseExamineText(state: GameState): string {
+  const variant = ACROSTIC_VARIANTS[state.randomized.acrosticVariantIndex];
+  return variant.poemCloseExamine;
+}
+
+/**
  * Get room description considering entry direction and state.
  */
 export function getRoomDescription(
@@ -399,6 +439,7 @@ export function getRoomDescription(
   if (!room) return "You are nowhere.";
 
   const roomState = state.roomStates[roomId];
+  const overrides = getDynamicRoomOverrides(roomId, state);
 
   // If the room was already visited and searched, use shorter description
   if (roomState.visited && roomState.searched && room.descriptions.searched) {
@@ -413,8 +454,8 @@ export function getRoomDescription(
     }
   }
 
-  // Check for NPCs in the room and append their presence
-  let desc = room.descriptions.default;
+  // Use override description if available
+  let desc = overrides.description || room.descriptions.default;
   const npcsHere = getNpcsInRoom(roomId, state);
   if (npcsHere.length > 0) {
     const npcDescs = npcsHere.map((npc) => npcPresenceText(npc, state));
@@ -468,19 +509,28 @@ export function getItemsInRoom(roomId: RoomId, state: GameState): string[] {
   const room = ROOM_DEFINITIONS[roomId];
   const roomState = state.roomStates[roomId];
 
-  // Base items minus taken items
-  const baseItems = room.items.filter((id) => !roomState.itemsTaken.includes(id));
+  // Base items minus taken items, but exclude items that have been reassigned via itemLocations
+  const reassignedItems = new Set(Object.keys(state.randomized.itemLocations));
+  const baseItems = room.items
+    .filter((id) => !roomState.itemsTaken.includes(id))
+    .filter((id) => !reassignedItems.has(id)); // Don't include items that were moved elsewhere
+
+  // Add structurally randomized items assigned to this room
+  const structuralHere = Object.entries(state.randomized.itemLocations)
+    .filter(([, rm]) => rm === roomId)
+    .map(([itemId]) => itemId)
+    .filter((id) => !roomState.itemsTaken.includes(id as ItemId));
 
   // Add floating items assigned to this room
   const floatingHere = Object.entries(state.randomized.floatingItems)
-    .filter(([, room]) => room === roomId)
+    .filter(([, rm]) => rm === roomId)
     .map(([itemId]) => itemId)
-    .filter((id) => !roomState.itemsTaken.includes(id as any));
+    .filter((id) => !roomState.itemsTaken.includes(id as ItemId));
 
   // Add revealed items
   const revealed = roomState.revealedItems.filter((id) => !roomState.itemsTaken.includes(id));
 
-  return [...baseItems, ...floatingHere, ...revealed];
+  return [...baseItems, ...structuralHere, ...floatingHere, ...revealed];
 }
 
 export function isRoomAccessible(

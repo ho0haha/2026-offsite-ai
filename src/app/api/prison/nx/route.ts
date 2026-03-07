@@ -112,10 +112,10 @@ export async function POST(req: NextRequest) {
   const targetOldScore = target.totalPoints ?? 0;
 
   // Calculate how many more nukes before cost exceeds 100%
-  let nukesRemaining = 0;
+  let lr = 0;
   for (let i = nukesLaunched + 1; i < 10; i++) {
     if (0.10 * Math.pow(2.25, i) < 1.0) {
-      nukesRemaining++;
+      lr++;
     } else {
       break;
     }
@@ -146,6 +146,6 @@ export async function POST(req: NextRequest) {
     costPercent,
     targetName: target.name,
     targetOldScore,
-    nukesRemaining,
+    lr,
   });
 }

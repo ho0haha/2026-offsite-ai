@@ -1,4 +1,5 @@
 import type { ItemDefinition, CombineRule, ItemId, GameState } from "./types";
+import { CRAFTING_VARIANTS } from "./randomizer";
 
 export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
   wire: {
@@ -29,8 +30,8 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     id: "lockpick",
     name: "improvised lockpick",
     aliases: ["lockpick", "pick", "lock pick"],
-    description: "A crude but functional lockpick — wire bent into shape with soap as a handle.",
-    examineText: "Wire bent into a tension wrench and pick, with the soap bar as a handle. It's rough but should work on simple locks.",
+    description: "A crude but functional improvised lockpick.",
+    examineText: "An improvised lockpick, rough but functional. It should work on simple locks.",
     takeable: true,
     weight: 1,
   },
@@ -209,6 +210,42 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     hidden: true,
     revealedBy: "examine_cross",
   },
+
+  candle_wax: {
+    id: "candle_wax",
+    name: "lump of candle wax",
+    aliases: ["candle wax", "wax", "candle"],
+    description: "A solid lump of hardened candle wax.",
+    examineText: "A dense lump of candle wax, hard and waxy. Could be heated and molded into a grip or handle for something.",
+    takeable: true,
+    weight: 1,
+    hidden: true,
+    revealedBy: "search",
+  },
+
+  hairpin: {
+    id: "hairpin",
+    name: "metal hairpin",
+    aliases: ["hairpin", "hair pin", "pin", "bobby pin"],
+    description: "A sturdy metal hairpin. Thin but strong.",
+    examineText: "A metal hairpin, about three inches long. Sturdy enough to bend into shapes. Could be useful for picking locks with some additional grip.",
+    takeable: true,
+    weight: 1,
+    hidden: true,
+    revealedBy: "search",
+  },
+
+  tape: {
+    id: "tape",
+    name: "roll of tape",
+    aliases: ["tape", "adhesive tape", "medical tape", "electrical tape"],
+    description: "A small roll of adhesive tape.",
+    examineText: "A roll of adhesive tape. Sticky and durable. Could be used to wrap around something for a better grip.",
+    takeable: true,
+    weight: 1,
+    hidden: true,
+    revealedBy: "search",
+  },
 };
 
 export const COMBINE_RULES: CombineRule[] = [
@@ -231,7 +268,27 @@ export function getItemByAlias(alias: string): ItemDefinition | null {
   return null;
 }
 
-export function findCombineRule(item1: ItemId, item2: ItemId): CombineRule | null {
+/**
+ * Find a combine rule that matches the given items.
+ * Uses the state's randomized crafting recipe to dynamically build the rule.
+ */
+export function findCombineRule(item1: ItemId, item2: ItemId, state?: GameState): CombineRule | null {
+  if (state) {
+    const [r1, r2] = state.randomized.craftingRecipe;
+    if ((item1 === r1 && item2 === r2) || (item1 === r2 && item2 === r1)) {
+      const variantIndex = (state.randomized as any).craftingVariantIndex ?? 0;
+      const variant = CRAFTING_VARIANTS[variantIndex];
+      return {
+        item1: r1,
+        item2: r2,
+        result: "lockpick" as ItemId,
+        description: variant.description,
+        consumeInputs: true,
+      };
+    }
+    return null;
+  }
+  // Fallback to static rules
   return (
     COMBINE_RULES.find(
       (r) =>

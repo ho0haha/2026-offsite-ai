@@ -7,8 +7,10 @@ import { eq, and } from "drizzle-orm";
 import { deserializeState, serializeState } from "@/lib/prison/state";
 import { PrisonGameEngine } from "@/lib/prison/engine";
 import { generateEscapeFlag } from "@/lib/prison/flag-generator";
+import { verifyCaptchaProof } from "@/lib/prison/captcha";
 import {
   RATE_LIMIT_MS,
+  WAIT_COMMAND_DELAY_MS,
   COMMAND_MAX_LENGTH,
   RESPONSE_LOG_MAX_LENGTH,
   CHALLENGE_ID_SORT_ORDER,
@@ -36,21 +38,21 @@ export async function POST(req: NextRequest) {
   if (now - lastCommand < RATE_LIMIT_MS) {
     const waitMs = RATE_LIMIT_MS - (now - lastCommand);
     return NextResponse.json(
-      { error: `Rate limited. Wait ${Math.ceil(waitMs / 1000)} seconds.` },
+      { error: `The old terminal processes slowly... (${Math.ceil(waitMs / 1000)} seconds)` },
       { status: 429 }
     );
   }
   rateLimitMap.set(participantId, now);
 
   // Parse request body
-  let body: { sessionId: string; command: string };
+  let body: { sessionId: string; command: string; captchaProof?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { sessionId, command } = body;
+  const { sessionId, command, captchaProof } = body;
   if (!sessionId || !command) {
     return NextResponse.json(
       { error: "sessionId and command are required" },
@@ -96,6 +98,21 @@ export async function POST(req: NextRequest) {
   // Load state and run engine
   const state = deserializeState(session.state);
   const engine = new PrisonGameEngine(state);
+
+  // If there's a pending captcha and a valid proof, clear it
+  if (state.pendingCaptcha && captchaProof) {
+    const isValidProof = verifyCaptchaProof(captchaProof, participantId);
+    if (isValidProof) {
+      engine.clearCaptcha(state.pendingCaptcha.trigger);
+    }
+  }
+
+  // Add server-side delay for WAIT command to enforce real-time pacing
+  const normalizedCommand = trimmedCommand.toLowerCase().trim();
+  if (normalizedCommand === "wait") {
+    await new Promise((r) => setTimeout(r, WAIT_COMMAND_DELAY_MS));
+  }
+
   const result = engine.processCommand(trimmedCommand);
 
   // Handle restart request
@@ -164,11 +181,19 @@ export async function POST(req: NextRequest) {
     })
     .run();
 
-  return NextResponse.json({
+  const response: Record<string, unknown> = {
     output: result.output,
     turnsRemaining: result.turnsRemaining,
     gameOver: result.gameOver,
     escaped: result.escaped,
     flag,
-  });
+  };
+
+  // If the engine signals a captcha is required, pass it through
+  if (result.requiresCaptcha) {
+    response.requiresCaptcha = true;
+    response.captchaTrigger = result.captchaTrigger;
+  }
+
+  return NextResponse.json(response);
 }

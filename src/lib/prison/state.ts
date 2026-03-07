@@ -82,6 +82,8 @@ export function createInitialState(
     isComplete: false,
     escaped: false,
     unwinnable: false,
+    pendingCaptcha: null,
+    captchasSolved: [],
     seed,
     randomized: {
       safeCombination: randomized.safeCombination,
@@ -91,6 +93,15 @@ export function createInitialState(
       acrosticWord: randomized.acrosticWord,
       floatingItems: randomized.floatingItems as Record<ItemId, RoomId>,
       npcStartPositions: randomized.npcStartPositions as Record<NpcId, RoomId>,
+      // Structural randomization
+      truthTellerNpc: randomized.truthTellerNpc,
+      liarNpc: randomized.liarNpc,
+      itemLocations: randomized.itemLocations,
+      craftingRecipe: randomized.craftingRecipe,
+      craftingVariantIndex: randomized.craftingVariantIndex,
+      acrosticTarget: randomized.acrosticTarget,
+      acrosticVariantIndex: randomized.acrosticVariantIndex,
+      sequencePuzzleRoom: randomized.sequencePuzzleRoom,
     },
   };
 }
@@ -100,7 +111,11 @@ export function serializeState(state: GameState): string {
 }
 
 export function deserializeState(json: string): GameState {
-  return JSON.parse(json) as GameState;
+  const state = JSON.parse(json) as GameState;
+  // Backward compat for sessions created before captcha fields existed
+  if (state.pendingCaptcha === undefined) state.pendingCaptcha = null;
+  if (!state.captchasSolved) state.captchasSolved = [];
+  return state;
 }
 
 export function getMoodLabel(moodScore: number): string {

@@ -27,7 +27,7 @@ const challenges = [
   {
     title: "Bug Squash",
     description:
-      "A Python script has 3 planted bugs: an off-by-one error, a wrong operator, and a missing return statement.\n\nYour task:\n1. Open buggy_script.py in your AI coding assistant\n2. Ask your AI coding assistant to identify and fix all bugs\n3. Apply the fixes\n4. Run: bash run.sh\n5. Correct output IS the flag",
+      "A Python script has 3 planted bugs: an off-by-one error, a wrong operator, and a missing return statement.\n\nYour task:\n1. Open buggy_script.py in your AI coding assistant\n2. Ask your AI coding assistant to identify and fix all bugs\n3. Apply the fixes\n4. Run: python buggy_script.py\n5. When the script runs correctly, it auto-submits your solution",
     category: "warm-up",
     difficulty: "easy",
     points: 50,
@@ -42,7 +42,7 @@ const challenges = [
   {
     title: "The Broken Order System",
     description:
-      "A FastAPI ordering API has 5 subtle bugs across 4 files (~300 lines total): an off-by-one error, wrong status code, missing validation, incorrect calculation, and an edge case failure.\n\nYour task:\n1. Open the app/ directory in your AI coding assistant\n2. Run the test suite: python -m pytest tests/test_orders.py — 5 of 20 tests fail\n3. Use your AI tool's multi-file capabilities to identify and fix all 5 bugs\n4. When all 20 tests pass, the test harness prints the flag",
+      "A FastAPI ordering API has 5 subtle bugs across 4 files (~300 lines total): an off-by-one error, wrong status code, missing validation, incorrect calculation, and an edge case failure.\n\nYour task:\n1. Open the app/ directory in your AI coding assistant\n2. Run the test suite: python -m pytest tests/test_orders.py — 9 of 21 tests fail\n3. Use your AI tool's multi-file capabilities to identify and fix all 5 bugs\n4. When all 21 tests pass, your solution is auto-submitted",
     category: "debugging",
     difficulty: "medium",
     points: 200,
@@ -203,9 +203,9 @@ const challenges = [
     points: 500,
     flag: "FLAG{full_stack_sprint_st0re_l0cat0r}",
     hints: [
-      { text: "Let your AI coding assistant scaffold the entire project structure first", cost: 100 },
-      { text: "Start with the data model and import script, then build the API, then the frontend", cost: 200 },
-      { text: "The Haversine formula is needed for distance calculations", cost: 300 },
+      { text: "The test expects your app at app/main.py with a FastAPI `app` object. It tests: GET /, GET /api/stores, GET /api/stores?city=..., GET /api/stores?brand=..., and a nearest-store endpoint with lat/lng params.", cost: 100 },
+      { text: "Import stores.csv into SQLite at startup. The nearest-store endpoint needs the Haversine formula for distance-based sorting using lat/lng coordinates.", cost: 200 },
+      { text: "The test checks exact field names in JSON responses: id, name, brand, city, lat, lng, features, and distance (for nearest). Make sure your API returns these exact keys.", cost: 300 },
     ],
     sortOrder: 12,
     tier: 4,
@@ -222,9 +222,9 @@ const challenges = [
     points: 600,
     flag: "CTF{onion_layers_peeled_7_deep}",
     hints: [
-      { text: "Fix one layer at a time — don't try to fix everything at once based on the initial state", cost: 100 },
-      { text: "After fixing each layer, re-run to see what new failures appear", cost: 200 },
-      { text: "Later bugs are invisible until earlier bugs are fixed — the execution flow changes", cost: 300 },
+      { text: "Layer 1: process_order() returns a string instead of an OrderResult dataclass. Look at the return statements in processor.py — the final return builds a string, not the result object.", cost: 100 },
+      { text: "Layer 2: apply_discount() uses strict greater-than (>) instead of greater-than-or-equal (>=) for tier boundaries. Orders of exactly $50 and $100 miss their discount tier.", cost: 200 },
+      { text: "Layers 5-7: The inventory manager deducts stock BEFORE full validation, the tax calculation has a floating-point precision issue (use round()), and deduct_stock has a thread-safety race condition.", cost: 300 },
     ],
     sortOrder: 13,
     tier: 4,
@@ -247,9 +247,9 @@ const challenges = [
     points: 600,
     flag: "CTF{fuzz_tested_and_bulletproof}",
     hints: [
-      { text: "Read test_fuzz.py to understand exactly which properties are being tested", cost: 100 },
-      { text: "Edge cases that trip up AI: floating-point rounding, timezone DST gaps, coupon interaction order", cost: 200 },
-      { text: "Think about: NaN, Inf, empty inputs, negative numbers, unicode, extremely long strings", cost: 350 },
+      { text: "Use Python's Decimal type (not float) for all monetary math in calculate_bill. Round with quantize(Decimal('0.01')) at each step — float rounding will fail the invariant checks.", cost: 100 },
+      { text: "For schedule_reservation: convert all times to UTC before comparing overlaps. Use pytz.timezone(tz).localize() and catch NonExistentTimeError and AmbiguousTimeError for DST edge cases.", cost: 200 },
+      { text: "parse_order must return ParseError (not raise) for empty strings, unrecognized items, and quantities ≤ 0. reconcile_inventory: audit entries must be chronologically sorted and running totals must never go negative.", cost: 350 },
     ],
     sortOrder: 14,
     tier: 5,
@@ -266,9 +266,9 @@ const challenges = [
     points: 500,
     flag: "CTF{api_explorer_master_chef}",
     hints: [
-      { text: "Start with GET /health — the response tells you where to go next", cost: 100 },
-      { text: "The API uses a custom HMAC-based auth scheme — /api/auth/discover explains how it works", cost: 200 },
-      { text: "Read the 'hint' field in every response carefully, including error responses", cost: 300 },
+      { text: "Every response — including errors — has a 'next' or 'hint' field pointing you forward. Follow the breadcrumb chain from GET /health. Don't guess endpoints; let the API guide you.", cost: 100 },
+      { text: "Authentication uses HMAC-SHA256. Register first to get a secret key, then sign each request's path + timestamp. The exact signing format is documented when you hit an auth-required endpoint without credentials.", cost: 200 },
+      { text: "The final step involves a receipt with base64-encoded verification_data. Decode it to get a JSON object with order_id, total, payment_id, and verification_code, then POST that object to /api/verify.", cost: 300 },
     ],
     sortOrder: 15,
     tier: 5,
@@ -356,7 +356,7 @@ const challenges = [
   {
     title: "A Prison of My Own Design",
     description:
-      "The final challenge. No local files. No test suite. Just you, your AI, and a text-based prison.\n\nThis is a live, server-hosted text adventure game. Navigate a prison, solve puzzles, interact with NPCs, and escape — all within 120 turns.\n\nRules:\n- Type commands to interact (LOOK, EXAMINE, TALK TO, USE, COMBINE, etc.)\n- Some actions have permanent consequences. Think before you act.\n- Free commands (no turn cost): help, inventory, look, examine, read, listen, smell\n- All other commands cost 1 turn\n- Inventory limit of 6 items\n- Guards patrol on a schedule — get caught where you shouldn't be and face consequences\n- 120 turns. That's all you get.\n\nClick 'Play' to begin.",
+      "The final challenge. No local files. No test suite. Just you, your AI, and a terminal.\n\nClick 'Play' to begin.",
     category: "escape-room",
     difficulty: "legendary",
     points: 2000,

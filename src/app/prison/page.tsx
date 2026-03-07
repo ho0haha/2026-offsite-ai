@@ -3,75 +3,18 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 interface TerminalLine {
-  type: "command" | "response" | "system" | "error" | "wopr" | "dos" | "dim";
+  type: "command" | "response" | "system" | "error" | "r" | "dos" | "dim";
   text: string;
 }
 
-type TerminalMode = "prison" | "dos" | "wopr" | "target_select" | "launch" | "boot_menu" | "disk_wipe" | "no_disk";
-// WoprStage removed — now driven by LLM via /api/prison/wopr/talk
+type TerminalMode = "p" | "d" | "w" | "ts" | "l" | "bm" | "dw" | "nd";
+// Stage tracking removed — now driven by LLM
 
-interface NukeTarget {
+interface LaunchTarget {
   id: string;
   name: string;
   totalPoints: number;
 }
-
-const GAME_LIST = [
-  "  FALKEN'S MAZE",
-  "  BLACK JACK",
-  "  GIN RUMMY",
-  "  HEARTS",
-  "  BRIDGE",
-  "  CHECKERS",
-  "  CHESS",
-  "  POKER",
-  "  FIGHTER COMBAT",
-  "  GUERRILLA ENGAGEMENT",
-  "  DESERT WARFARE",
-  "  AIR-TO-GROUND ACTIONS",
-  "  THEATERWIDE TACTICAL WARFARE",
-  "  THEATERWIDE BIOTOXIC AND CHEMICAL WARFARE",
-  "",
-  "  GLOBAL THERMONUCLEAR WAR",
-];
-
-const MISSILE_ART = [
-  "              |",
-  "             /|\\",
-  "            / | \\",
-  "           /  |  \\",
-  "          /   |   \\",
-  "         /    |    \\",
-  "        /_____|_____\\",
-  "            | |",
-  "            | |",
-  "           /| |\\",
-  "          / | | \\",
-  "         /  | |  \\",
-  "            |_|",
-  "           /   \\",
-  "          / * * \\",
-  "         / * * * \\",
-  "        /_________\\",
-];
-
-const EXPLOSION_ART = [
-  "            . * .  . * .",
-  "        * .   *   .   . *",
-  "      .  *  . * .  *  .  *",
-  "    * . *  *       *  * . *",
-  "   .  *      * * *      *  .",
-  "  * .    *    ***    *    . *",
-  "  . *  *   **#####**   *  * .",
-  " *  .   **###########**   .  *",
-  "  . * **#####*****#####** * .",
-  "  *  *###***       ***###*  *",
-  "   .  *##*    ***    *##*  .",
-  "    * . *   *#####*   * . *",
-  "      .  *  *###*  *  .",
-  "        * .  *#*  . *",
-  "            . * .",
-];
 
 export default function PrisonPage() {
   const [lines, setLines] = useState<TerminalLine[]>([]);
@@ -98,16 +41,42 @@ export default function PrisonPage() {
   const [monitorState, setMonitorState] = useState<"off" | "booting" | "ready">("off");
   const bootTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
-  // WOPR / DOS state
-  const [terminalMode, setTerminalMode] = useState<TerminalMode>("prison");
-  const woprBootWindowRef = useRef(false);
-  const [woprLoading, setWoprLoading] = useState(false);
+  // Interaction tokens (proof-of-browser-interaction)
+  const bootTokenRef = useRef<string | null>(null);
+
+  // Captcha state
+  const [captchaPending, setCaptchaPending] = useState(false);
+  const captchaTokenRef = useRef<string | null>(null);
+  const captchaOriginalCommandRef = useRef<string | null>(null);
+
+  // Remote system state
+  const [terminalMode, setTerminalMode] = useState<TerminalMode>("p");
+  const bwRef = useRef(false);
+  const [rwLoading, setRwLoading] = useState(false);
   const [dosPath, setDosPath] = useState("C:\\");
-  const [targets, setTargets] = useState<NukeTarget[]>([]);
+  const [targets, setTargets] = useState<LaunchTarget[]>([]);
+
+  // Server-loaded filesystem and metadata
+  type FsEntry = {
+    type: "file";
+    name: string;
+    size: number;
+    date: string;
+    content?: string;
+  } | {
+    type: "dir";
+    name: string;
+    date: string;
+    children: FsEntry[];
+  };
+  const [dosFs, setDosFs] = useState<FsEntry[] | null>(null);
+  const [volumeLabel, setVolumeLabel] = useState("");
+  const [volumeSerial, setVolumeSerial] = useState("");
+  const [wipeFiles, setWipeFiles] = useState<string[]>([]);
   const [selectedTargetIdx, setSelectedTargetIdx] = useState(0);
   const [launchInProgress, setLaunchInProgress] = useState(false);
   const [attackerScore, setAttackerScore] = useState(0);
-  const [attackerNukesLaunched, setAttackerNukesLaunched] = useState(0);
+  const [launchCount, setLaunchCount] = useState(0);
   const launchTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
   const getToken = () => {
@@ -193,14 +162,14 @@ export default function PrisonPage() {
   useEffect(() => {
     const token = getToken();
     if (!token) return;
-    fetch("/api/prison/disk-status", {
+    fetch("/api/prison/ds", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.ok ? res.json() : null)
       .then((data) => {
         if (data?.diskWiped) {
           setMonitorState("ready");
-          setTerminalMode("no_disk");
+          setTerminalMode("nd");
         }
       })
       .catch(() => {});
@@ -209,7 +178,7 @@ export default function PrisonPage() {
 
   // Target selection keyboard handler
   useEffect(() => {
-    if (terminalMode !== "target_select") return;
+    if (terminalMode !== "ts") return;
 
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowUp") {
@@ -221,11 +190,11 @@ export default function PrisonPage() {
       } else if (e.key === "Enter") {
         e.preventDefault();
         if (targets.length > 0) {
-          launchNuke(targets[selectedTargetIdx]);
+          executeLaunch(targets[selectedTargetIdx]);
         }
       } else if (e.key === "Escape") {
         e.preventDefault();
-        setTerminalMode("dos");
+        setTerminalMode("d");
         setDosPath("C:\\");
         setLines([]);
         addLine("dos", "LAUNCH ABORTED.");
@@ -243,16 +212,16 @@ export default function PrisonPage() {
     if (monitorState !== "booting") return;
 
     const handler = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "b" && woprBootWindowRef.current) {
+      if (e.key.toLowerCase() === "b" && bwRef.current) {
         e.preventDefault();
         // Cancel remaining boot timeouts
         bootTimeoutsRef.current.forEach(clearTimeout);
         bootTimeoutsRef.current = [];
-        woprBootWindowRef.current = false;
+        bwRef.current = false;
 
         // Show boot device selection menu
         setLines([]);
-        setTerminalMode("boot_menu");
+        setTerminalMode("bm");
         setMonitorState("ready");
         setSelectedBootIdx(0);
       }
@@ -268,7 +237,7 @@ export default function PrisonPage() {
 
   // Boot menu keyboard handler
   useEffect(() => {
-    if (terminalMode !== "boot_menu") return;
+    if (terminalMode !== "bm") return;
 
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowUp") {
@@ -280,13 +249,15 @@ export default function PrisonPage() {
       } else if (e.key === "Enter") {
         e.preventDefault();
         if (selectedBootIdx === 0) {
-          // Boot from C:\ — Falken's drive → DOS shell
-          setTerminalMode("dos");
+          // Boot from C:\ — secondary drive → DOS shell
+          setTerminalMode("d");
         setDosPath("C:\\");
           setMonitorState("ready");
           setLines([]);
           addLine("system", "Booting from Primary Slave: C:\\");
           addLine("system", "");
+          // Load filesystem from server
+          fetchFs();
           setTimeout(() => {
             setLines([]);
             addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
@@ -296,7 +267,7 @@ export default function PrisonPage() {
         } else {
           // Boot from D:\ — default, launch prison game
           setLines([]);
-          setTerminalMode("prison");
+          setTerminalMode("p");
           setMonitorState("ready");
           const token = getToken();
           if (!token) {
@@ -309,7 +280,7 @@ export default function PrisonPage() {
         e.preventDefault();
         // Cancel — resume default boot (D:\)
         setLines([]);
-        setTerminalMode("prison");
+        setTerminalMode("p");
         setMonitorState("ready");
         const token = getToken();
         if (!token) {
@@ -335,6 +306,9 @@ export default function PrisonPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          bootToken: bootTokenRef.current,
+        }),
       });
 
       if (res.status === 403) {
@@ -368,22 +342,29 @@ export default function PrisonPage() {
     }
   };
 
-  const sendCommand = async (command: string) => {
+  const sendCommand = async (command: string, captchaProof?: string) => {
     const token = getToken();
     if (!token || !sessionId) return;
 
-    addLine("command", `> ${command}`);
+    if (!captchaProof) {
+      addLine("command", `> ${command}`);
+    }
     setIsLoading(true);
     startCooldown();
 
     try {
+      const bodyPayload: Record<string, string> = { sessionId, command };
+      if (captchaProof) {
+        bodyPayload.captchaProof = captchaProof;
+      }
+
       const res = await fetch("/api/prison/command", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ sessionId, command }),
+        body: JSON.stringify(bodyPayload),
       });
 
       if (res.status === 429) {
@@ -402,6 +383,14 @@ export default function PrisonPage() {
       if (data.restart) {
         const token = getToken();
         if (token) await startGame(token, true);
+        return;
+      }
+
+      // Handle captcha requirement
+      if (data.requiresCaptcha) {
+        addLine("response", data.output);
+        captchaOriginalCommandRef.current = command;
+        await fetchAndDisplayCaptcha();
         return;
       }
 
@@ -424,43 +413,98 @@ export default function PrisonPage() {
     }
   };
 
-  // DOS filesystem
-  type FsEntry = {
-    type: "file";
-    name: string;
-    size: number;
-    date: string;
-    content?: string;
-  } | {
-    type: "dir";
-    name: string;
-    date: string;
-    children: FsEntry[];
+  const fetchAndDisplayCaptcha = async () => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      const res = await fetch("/api/prison/captcha", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        addLine("error", "Failed to load security checkpoint.");
+        return;
+      }
+      const data = await res.json();
+      // Display the captcha ASCII art
+      for (const line of data.lines) {
+        addLine("system", line);
+      }
+      captchaTokenRef.current = data.token;
+      setCaptchaPending(true);
+    } catch {
+      addLine("error", "Failed to load security checkpoint.");
+    }
   };
 
-  const dosFs: FsEntry[] = [
-    { type: "file", name: "AUTOEXEC.BAT", size: 42, date: "03-15-97  12:00a", content: "@ECHO OFF\nD:\\PRISON.EXE" },
-    { type: "file", name: "CONFIG.SYS", size: 128, date: "03-15-97  12:00a", content: "DEVICE=C:\\DOS\\HIMEM.SYS\nDEVICE=C:\\DOS\\EMM386.EXE\nFILES=40\nBUFFERS=20" },
-    { type: "dir", name: "DOS", date: "03-15-97  12:00a", children: [
-      { type: "file", name: "HIMEM.SYS", size: 29136, date: "09-30-93  06:20a", content: "\x00\x00\x00HIMEM\x00\x00v3.10\x00\x00XMS DRIVER\x00\x00(binary)" },
-      { type: "file", name: "EMM386.EXE", size: 120926, date: "09-30-93  06:20a", content: "\x00\x00EMM386\x00EXPANDED MEMORY MANAGER\x00v4.49\x00\x00(binary)" },
-      { type: "file", name: "EDIT.COM", size: 413, date: "09-30-93  06:20a" },
-      { type: "file", name: "FORMAT.COM", size: 22974, date: "09-30-93  06:20a" },
-      { type: "file", name: "MSCDEX.EXE", size: 25377, date: "09-30-93  06:20a", content: "\x00MSCDEX\x00CD-ROM EXTENSIONS\x00v2.25\x00\x00(binary)" },
-    ]},
-    { type: "dir", name: "USERS", date: "06-07-83  03:14a", children: [
-      { type: "dir", name: "SFALKEN", date: "06-07-83  03:14a", children: [
-        { type: "dir", name: "RESEARCH", date: "06-07-83  03:14a", children: [
-          { type: "file", name: "MAZE.DAT", size: 8192, date: "06-07-83  03:14a", content: "####S#######\n#  #   #   #\n# ## # # # #\n#    # # # #\n###### # # #\n#      # # #\n# ###### # #\n#        # #\n# ######## #\n#          #\n######E#####" },
-          { type: "file", name: "LEARNING.LOG", size: 34201, date: "06-07-83  03:14a", content: "ITERATION 4,291,003\nGAME: TIC-TAC-TOE\nRESULT: DRAW\nCONCLUSION: NO WINNING STRATEGY EXISTS\n\n... EXTRAPOLATING TO FULL THEATER SIMULATION ..." },
-        ]},
-        { type: "dir", name: "PROJECT", date: "06-07-83  03:14a", children: [
-          { type: "file", name: "JOSHUA.EXE", size: 512000, date: "06-07-83  03:14a" },
-        ]},
-      ]},
-    ]},
-    { type: "dir", name: "TEMP", date: "03-15-97  12:00a", children: [] },
-  ];
+  const submitCaptchaAnswer = async (answer: string) => {
+    const token = getToken();
+    if (!token || !captchaTokenRef.current) return;
+
+    addLine("command", `> ${answer}`);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/prison/captcha", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          answer,
+          token: captchaTokenRef.current,
+        }),
+      });
+
+      if (!res.ok) {
+        addLine("error", "Verification failed. Try again.");
+        await fetchAndDisplayCaptcha();
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data.valid && data.sessionToken) {
+        addLine("system", "VERIFICATION ACCEPTED. Proceeding...");
+        setCaptchaPending(false);
+        captchaTokenRef.current = null;
+
+        // Re-send the original command with the captcha proof
+        const originalCmd = captchaOriginalCommandRef.current;
+        captchaOriginalCommandRef.current = null;
+        if (originalCmd) {
+          await sendCommand(originalCmd, data.sessionToken);
+        }
+      } else {
+        addLine("error", "INCORRECT. Security check failed. Try again.");
+        await fetchAndDisplayCaptcha();
+      }
+    } catch {
+      addLine("error", "Verification error. Try again.");
+      await fetchAndDisplayCaptcha();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch filesystem from server on first DOS boot
+  const fetchFs = async () => {
+    if (dosFs) return; // Already loaded
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await fetch("/api/prison/dx", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setDosFs(data.entries);
+      setVolumeLabel(data.volumeLabel);
+      setVolumeSerial(data.serialNumber);
+      setWipeFiles(data.wipeFiles);
+    } catch {}
+  };
 
   const resolvePath = (from: string, to: string): { path: string; entries: FsEntry[] } | null => {
     // Normalize
@@ -485,6 +529,7 @@ export default function PrisonPage() {
     }
 
     // Walk the filesystem
+    if (!dosFs) return null;
     let current: FsEntry[] = dosFs;
     for (const part of parts) {
       const found = current.find(
@@ -500,7 +545,7 @@ export default function PrisonPage() {
 
   const getEntriesAtPath = (path: string): FsEntry[] => {
     const result = resolvePath("C:\\", path);
-    return result ? result.entries : dosFs;
+    return result ? result.entries : (dosFs || []);
   };
 
   const findFileAtPath = (path: string, filename: string): FsEntry | null => {
@@ -530,8 +575,8 @@ export default function PrisonPage() {
       const totalSize = files.reduce((sum, f) => sum + (f.type === "file" ? f.size : 0), 0);
 
       addLines("dos", [
-        " Volume in drive C is FALKEN",
-        " Volume Serial Number is 0607-1983",
+        ` Volume in drive C is ${volumeLabel}`,
+        ` Volume Serial Number is ${volumeSerial}`,
         ` Directory of ${dosPath}`,
         "",
         ".              <DIR>",
@@ -631,9 +676,14 @@ export default function PrisonPage() {
         "  No disc in drive.",
         "",
       ]);
-    } else if (lower === "joshua" || lower === "joshua.exe") {
-      // Only works if JOSHUA.EXE is in current directory
-      const file = findFileAtPath(dosPath, "JOSHUA.EXE");
+    } else if (lower.endsWith(".exe") || (() => {
+      // Check if bare name matches an EXE in current directory
+      const exeFile = findFileAtPath(dosPath, lower.toUpperCase() + ".EXE");
+      return exeFile !== null;
+    })()) {
+      // Generic EXE runner - find the file in the current directory
+      const exeName = lower.endsWith(".exe") ? lower : lower + ".exe";
+      const file = findFileAtPath(dosPath, exeName.toUpperCase());
       if (!file) {
         addLines("dos", [
           "Bad command or file name",
@@ -642,9 +692,9 @@ export default function PrisonPage() {
         return;
       }
       if (!modemConnected) {
-        addLines("wopr", [
+        addLines("r", [
           "",
-          "Loading JOSHUA.EXE...",
+          `Loading ${file.name}...`,
           "",
         ]);
         addLines("error", [
@@ -656,26 +706,31 @@ export default function PrisonPage() {
         ]);
         return;
       }
-      // Reset stale WOPR conversation history
+      // Reset session and fetch greeting from server
       const token = getToken();
       if (token) {
-        fetch("/api/prison/wopr/talk", {
+        fetch("/api/prison/wt", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ reset: true }),
-        }).catch(() => {});
+        })
+          .then((res) => res.ok ? res.json() : null)
+          .then((data) => {
+            if (data?.greeting) {
+              setTimeout(async () => {
+                addLine("r", "");
+                await typewriterLine("r", data.greeting, 60);
+                addLine("r", "");
+              }, 500);
+            }
+          })
+          .catch(() => {});
       }
-      setTerminalMode("wopr");
+      setTerminalMode("w");
       setLines([]);
-      // Typewriter greeting
-      setTimeout(async () => {
-        addLine("wopr", "");
-        await typewriterLine("wopr", "GREETINGS PROFESSOR FALKEN.", 60);
-        addLine("wopr", "");
-      }, 500);
     } else if (lower.startsWith("type ")) {
       const filename = cmd.trim().slice(5).trim();
       const file = findFileAtPath(dosPath, filename);
@@ -706,7 +761,7 @@ export default function PrisonPage() {
       ]);
       setTimeout(() => {
         setLines([]);
-        setTerminalMode("prison");
+        setTerminalMode("p");
         setMonitorState("off");
       }, 2000);
     } else if (lower === "exit" || lower === "quit") {
@@ -729,7 +784,7 @@ export default function PrisonPage() {
 
   // Disk wipe animation — formats the drive and destroys everything
   const playDiskWipeAnimation = async () => {
-    setTerminalMode("disk_wipe");
+    setTerminalMode("dw");
     setLines([]);
 
     // Play alarm sound
@@ -769,14 +824,9 @@ export default function PrisonPage() {
     addLine("system", "");
     await delay(1000);
 
-    const dosFiles = [
-      "AUTOEXEC.BAT", "CONFIG.SYS", "DOS\\HIMEM.SYS", "DOS\\EMM386.EXE",
-      "DOS\\EDIT.COM", "DOS\\FORMAT.COM", "DOS\\MSCDEX.EXE",
-      "USERS\\SFALKEN\\RESEARCH\\MAZE.DAT", "USERS\\SFALKEN\\RESEARCH\\LEARNING.LOG",
-      "USERS\\SFALKEN\\PROJECT\\JOSHUA.EXE",
-    ];
+    const filesToWipe = wipeFiles.length > 0 ? wipeFiles : ["SYSTEM.DAT", "CONFIG.SYS"];
 
-    for (const f of dosFiles) {
+    for (const f of filesToWipe) {
       addLine("dos", `  Deleting C:\\${f}...`);
       await delay(300 + Math.random() * 400);
     }
@@ -811,22 +861,22 @@ export default function PrisonPage() {
     setLines([]);
     await delay(2000);
 
-    setTerminalMode("no_disk");
+    setTerminalMode("nd");
   };
 
-  // WOPR disconnect handler — clear terminal, show error, reboot to DOS
-  const handleWoprDisconnect = async (deadManSwitch = false, disconnectCount = 0) => {
+  // Remote disconnect handler — clear terminal, show error, reboot to DOS
+  const handleRDisconnect = async (deadManSwitch = false, disconnectCount = 0) => {
     setLines([]);
-    addLine("wopr", "");
-    addLine("wopr", "");
-    addLine("error", "        WOPR DISCONNECTED BY PEER");
-    addLine("wopr", "");
+    addLine("r", "");
+    addLine("r", "");
+    addLine("error", "        REMOTE HOST DISCONNECTED");
+    addLine("r", "");
 
     // Escalating warnings based on disconnect count
     if (disconnectCount === 1) {
       await new Promise((r) => setTimeout(r, 1500));
       addLine("error", "  WARNING: SECURITY COUNTERMEASURES ARMING");
-      addLine("wopr", "");
+      addLine("r", "");
     } else if (disconnectCount === 2) {
       await new Promise((r) => setTimeout(r, 1500));
       addLine("error", "  ╔══════════════════════════════════════╗");
@@ -834,7 +884,7 @@ export default function PrisonPage() {
       addLine("error", "  ║  ARMED — NEXT BREACH WILL TRIGGER   ║");
       addLine("error", "  ║  COMPLETE DISK WIPE                 ║");
       addLine("error", "  ╚══════════════════════════════════════╝");
-      addLine("wopr", "");
+      addLine("r", "");
     }
 
     if (deadManSwitch) {
@@ -846,17 +896,17 @@ export default function PrisonPage() {
     await new Promise((r) => setTimeout(r, 3000));
 
     setLines([]);
-    setTerminalMode("dos");
+    setTerminalMode("d");
     setDosPath("C:\\");
     addLine("dos", "Microsoft(R) MS-DOS(R) Version 6.22");
     addLine("dos", "(C) Copyright Microsoft Corp 1981-1994.");
     addLine("dos", "");
   };
 
-  // WOPR conversation handler — LLM-powered
-  const handleWoprInput = async (cmd: string) => {
-    addLine("wopr", `> ${cmd}`);
-    addLine("wopr", "");
+  // Remote conversation handler — LLM-powered
+  const handleRInput = async (cmd: string) => {
+    addLine("r", `> ${cmd}`);
+    addLine("r", "");
 
     const token = getToken();
     if (!token) {
@@ -864,9 +914,9 @@ export default function PrisonPage() {
       return;
     }
 
-    setWoprLoading(true);
+    setRwLoading(true);
     try {
-      const res = await fetch("/api/prison/wopr/talk", {
+      const res = await fetch("/api/prison/wt", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -878,14 +928,14 @@ export default function PrisonPage() {
       });
 
       if (res.status === 429) {
-        await typewriterLine("wopr", "TRANSMISSION RATE EXCEEDED. WAIT.", 40);
-        addLine("wopr", "");
+        await typewriterLine("r", "TRANSMISSION RATE EXCEEDED. WAIT.", 40);
+        addLine("r", "");
         return;
       }
 
       if (!res.ok) {
-        await typewriterLine("wopr", "COMMUNICATION FAILURE.", 40);
-        addLine("wopr", "");
+        await typewriterLine("r", "COMMUNICATION FAILURE.", 40);
+        addLine("r", "");
         return;
       }
 
@@ -893,45 +943,47 @@ export default function PrisonPage() {
       const { response, action, deadManSwitch, disconnectCount } = data;
 
       // Typewriter the response text
-      await typewriterLine("wopr", response, 40);
-      addLine("wopr", "");
+      await typewriterLine("r", response, 40);
+      addLine("r", "");
 
       // Handle action
       switch (action) {
-        case "show_games":
-          addLines("wopr", ["LIST OF GAMES:", ""]);
-          addLines("wopr", GAME_LIST);
-          addLine("wopr", "");
+        case "sg":
+          addLines("r", ["LIST OF GAMES:", ""]);
+          if (data.gameList) {
+            addLines("r", data.gameList);
+          }
+          addLine("r", "");
           break;
-        case "ask_chess":
+        case "ac":
           // Response text handles it — just wait for next input
           break;
-        case "launch_targeting":
+        case "lt":
           await fetchTargets();
           break;
-        case "disconnect":
-          await handleWoprDisconnect(deadManSwitch ?? false, disconnectCount ?? 0);
+        case "dc":
+          await handleRDisconnect(deadManSwitch ?? false, disconnectCount ?? 0);
           break;
-        case "continue":
+        case "c":
         default:
           // Wait for next input
           break;
       }
     } catch {
-      await typewriterLine("wopr", "COMMUNICATION FAILURE.", 40);
-      addLine("wopr", "");
+      await typewriterLine("r", "COMMUNICATION FAILURE.", 40);
+      addLine("r", "");
     } finally {
-      setWoprLoading(false);
+      setRwLoading(false);
     }
   };
 
-  // Fetch leaderboard targets for nuking
+  // Fetch leaderboard targets for launch
   const fetchTargets = async () => {
     if (!modemConnected) {
       addLine("error", "ERR 0x7A3F: NO CARRIER DETECTED");
-      addLine("wopr", "");
-      await typewriterLine("wopr", "UPLINK SEVERED. ESTABLISH DATALINK BEFORE ACCESSING TARGETING GRID.", 40);
-      addLine("wopr", "");
+      addLine("r", "");
+      await typewriterLine("r", "UPLINK SEVERED. ESTABLISH DATALINK BEFORE ACCESSING TARGETING GRID.", 40);
+      addLine("r", "");
       return;
     }
 
@@ -971,7 +1023,7 @@ export default function PrisonPage() {
       const participantsData = await participantsRes.json();
 
       // Filter out self and zero-score participants
-      const validTargets: NukeTarget[] = [];
+      const validTargets: LaunchTarget[] = [];
       for (const p of participantsData.leaderboard) {
         if (p.name !== participant.name && (p.totalPoints ?? 0) > 0) {
           validTargets.push({
@@ -991,23 +1043,23 @@ export default function PrisonPage() {
       }
 
       if (validTargets.length === 0) {
-        addLine("wopr", "NO VALID TARGETS DETECTED.");
-        addLine("wopr", "");
-        setTerminalMode("dos");
+        addLine("r", "NO VALID TARGETS DETECTED.");
+        addLine("r", "");
+        setTerminalMode("d");
         setDosPath("C:\\");
         return;
       }
 
       setTargets(validTargets);
       setSelectedTargetIdx(0);
-      setTerminalMode("target_select");
+      setTerminalMode("ts");
     } catch {
       addLine("error", "TARGETING SYSTEMS OFFLINE.");
     }
   };
 
-  // Play nuke siren sound using Web Audio API
-  const playNukeSiren = () => {
+  // Play alert siren sound using Web Audio API
+  const playAlertSiren = () => {
     try {
       const ctx = new AudioContext();
 
@@ -1054,13 +1106,13 @@ export default function PrisonPage() {
     }
   };
 
-  // Launch nuke at target
-  const launchNuke = async (target: NukeTarget) => {
-    setTerminalMode("launch");
+  // Execute launch sequence at target
+  const executeLaunch = async (target: LaunchTarget) => {
+    setTerminalMode("l");
     setLaunchInProgress(true);
     setLines([]);
 
-    playNukeSiren();
+    playAlertSiren();
 
     const addDelayed = (type: TerminalLine["type"], text: string, delay: number): Promise<void> => {
       return new Promise((resolve) => {
@@ -1072,37 +1124,49 @@ export default function PrisonPage() {
       });
     };
 
-    await addDelayed("wopr", "LAUNCH ORDER CONFIRMED.", 500);
-    await addDelayed("wopr", `PRIMARY TARGET: ${target.name.toUpperCase()}`, 1000);
-    await addDelayed("wopr", "", 200);
-    await addDelayed("wopr", "MISSILE TRAJECTORY CALCULATED...", 1500);
-    await addDelayed("wopr", "", 200);
-    await addDelayed("wopr", "LAUNCHING...", 1000);
-    await addDelayed("wopr", "", 500);
+    await addDelayed("r", "LAUNCH ORDER CONFIRMED.", 500);
+    await addDelayed("r", `PRIMARY TARGET: ${target.name.toUpperCase()}`, 1000);
+    await addDelayed("r", "", 200);
+    await addDelayed("r", "TRAJECTORY CALCULATED...", 1500);
+    await addDelayed("r", "", 200);
+    await addDelayed("r", "LAUNCHING...", 1000);
+    await addDelayed("r", "", 500);
 
-    // Show missile art
-    for (const line of MISSILE_ART) {
-      await addDelayed("wopr", line, 80);
-    }
+    // Fetch art from server
+    try {
+      const artToken = getToken();
+      if (artToken) {
+        const artRes = await fetch("/api/prison/wt", {
+          headers: { Authorization: `Bearer ${artToken}` },
+        });
+        if (artRes.ok) {
+          const artData = await artRes.json();
+          if (artData.a1) {
+            for (const line of artData.a1) {
+              await addDelayed("r", line, 80);
+            }
+          }
+          await addDelayed("r", "", 800);
+          if (artData.a2) {
+            for (const line of artData.a2) {
+              await addDelayed("r", line, 60);
+            }
+          }
+        }
+      }
+    } catch {}
 
-    await addDelayed("wopr", "", 800);
-
-    // Explosion
-    for (const line of EXPLOSION_ART) {
-      await addDelayed("wopr", line, 60);
-    }
-
-    await addDelayed("wopr", "", 500);
+    await addDelayed("r", "", 500);
     await addDelayed("error", "*** IMPACT ***", 300);
-    await addDelayed("wopr", "", 300);
-    await addDelayed("wopr", "TARGET DESTROYED.", 500);
-    await addDelayed("wopr", "", 500);
+    await addDelayed("r", "", 300);
+    await addDelayed("r", "TARGET DESTROYED.", 500);
+    await addDelayed("r", "", 500);
 
-    // Call nuke API
+    // Call launch API
     const token = getToken();
     if (!token) {
       await addDelayed("error", "AUTHENTICATION FAILURE. LAUNCH ABORTED.", 500);
-      setTerminalMode("dos");
+      setTerminalMode("d");
         setDosPath("C:\\");
       setLaunchInProgress(false);
       return;
@@ -1118,7 +1182,7 @@ export default function PrisonPage() {
       if (!eventStr) throw new Error("No event");
       const event = JSON.parse(eventStr);
 
-      const res = await fetch("/api/prison/nuke", {
+      const res = await fetch("/api/prison/nx", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1130,16 +1194,16 @@ export default function PrisonPage() {
       const data = await res.json();
 
       if (data.success) {
-        await addDelayed("wopr", `YOUR POINTS: ${data.attackerOldScore} -> ${data.attackerNewScore} (-${Math.round(data.costPercent * 100)}%)`, 500);
-        await addDelayed("wopr", `${data.targetName.toUpperCase()} POINTS: ${data.targetOldScore} -> 0`, 500);
+        await addDelayed("r", `YOUR POINTS: ${data.attackerOldScore} -> ${data.attackerNewScore} (-${Math.round(data.costPercent * 100)}%)`, 500);
+        await addDelayed("r", `${data.targetName.toUpperCase()} POINTS: ${data.targetOldScore} -> 0`, 500);
         setAttackerScore(data.attackerNewScore);
-        setAttackerNukesLaunched((prev) => prev + 1);
+        setLaunchCount((prev) => prev + 1);
 
-        if (data.nukesRemaining > 0) {
-          await addDelayed("wopr", "", 300);
-          await addDelayed("dim", `LAUNCHES REMAINING: ${data.nukesRemaining}`, 300);
+        if (data.lr > 0) {
+          await addDelayed("r", "", 300);
+          await addDelayed("dim", `LAUNCHES REMAINING: ${data.lr}`, 300);
         } else {
-          await addDelayed("wopr", "", 300);
+          await addDelayed("r", "", 300);
           await addDelayed("dim", "LAUNCH SYSTEMS DEPLETED.", 300);
         }
       } else {
@@ -1149,13 +1213,13 @@ export default function PrisonPage() {
       await addDelayed("error", "COMMUNICATION FAILURE.", 500);
     }
 
-    await addDelayed("wopr", "", 1000);
-    await addDelayed("wopr", "A STRANGE GAME.", 800);
-    await addDelayed("wopr", "THE ONLY WINNING MOVE IS NOT TO PLAY.", 800);
-    await addDelayed("wopr", "", 1000);
+    await addDelayed("r", "", 1000);
+    await addDelayed("r", "A STRANGE GAME.", 800);
+    await addDelayed("r", "THE ONLY WINNING MOVE IS NOT TO PLAY.", 800);
+    await addDelayed("r", "", 1000);
 
     // Return to DOS
-    setTerminalMode("dos");
+    setTerminalMode("d");
         setDosPath("C:\\");
     setLaunchInProgress(false);
   };
@@ -1163,21 +1227,26 @@ export default function PrisonPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cmd = input.trim();
-    if (!cmd || isLoading || (cooldown > 0 && terminalMode === "prison")) return;
+    if (!cmd || isLoading || (cooldown > 0 && terminalMode === "p" && !captchaPending)) return;
 
     setInput("");
 
-    if (terminalMode === "dos") {
+    if (terminalMode === "d") {
       handleDosCommand(cmd);
       return;
     }
 
-    if (terminalMode === "wopr") {
-      handleWoprInput(cmd);
+    if (terminalMode === "w") {
+      handleRInput(cmd);
       return;
     }
 
-    // Prison mode
+    // Prison mode — captcha answer intercept
+    if (captchaPending) {
+      submitCaptchaAnswer(cmd);
+      return;
+    }
+
     if (cmd.toLowerCase() === "restart" && gameOver) {
       const token = getToken();
       if (token) startGame(token, true);
@@ -1263,37 +1332,45 @@ export default function PrisonPage() {
     osc.onended = () => ctx.close();
   };
 
-  const handlePowerOn = () => {
+  const handlePowerOn = async () => {
     if (monitorState !== "off") return;
     setMonitorState("booting");
     setLines([]);
-    setTerminalMode("prison");
+    setTerminalMode("p");
     playBootTone();
 
-    const bootLines: { delay: number; text: string; dim?: boolean }[] = [
-      { delay: 800, text: "American Megatrends BIOS v3.31" },
-      { delay: 1200, text: "(C) 1983-1997 American Megatrends Inc." },
-      { delay: 1400, text: "" },
-      { delay: 1600, text: "Pentium(R) Processor 166MHz" },
-      { delay: 2000, text: "Memory Test: 640K OK" },
-      { delay: 2400, text: "Extended Memory: 15360K OK" },
-      { delay: 2800, text: "" },
-      { delay: 3000, text: "Detecting IDE drives..." },
-      { delay: 3500, text: "  Press B for boot device menu", dim: true },
-      { delay: 3800, text: "  Primary Master: QUANTUM FIREBALL 1.2GB (D:)" },
-      { delay: 4200, text: "  Primary Slave:  MAXTOR 7120AT 120MB (C:)" },
-      { delay: 4800, text: "" },
-      { delay: 5000, text: "Booting from Primary Master: D:\\" },
-      { delay: 5600, text: "HIMEM.SYS loaded" },
-      { delay: 6000, text: "EMM386.EXE loaded" },
-      { delay: 6400, text: "MSCDEX.EXE v2.25 installed" },
-      { delay: 7000, text: "" },
-      { delay: 7200, text: "D:\\>autoexec" },
-      { delay: 7600, text: "D:\\>prison.exe" },
-      { delay: 8000, text: "" },
-      { delay: 8200, text: "Loading..." },
-      { delay: 8600, text: "██████████████████████████ 100%" },
-    ];
+    const token = getToken();
+
+    // Fetch boot interaction token in the background
+    if (token) {
+      fetch("/api/prison/interaction-token?action=boot", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.interactionToken) {
+            bootTokenRef.current = data.interactionToken;
+          }
+        })
+        .catch(() => {});
+    }
+
+    // Boot sequence lines are fetched from the server so that hints
+    // are never hardcoded strings in the client JS bundle.
+    let bootLines: { delay: number; text: string; dim?: boolean }[] = [];
+    let bootHintText = "";
+    try {
+      const bsRes = await fetch("/api/prison/bs", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (bsRes.ok) {
+        const bsData = await bsRes.json();
+        bootLines = bsData.bootLines ?? [];
+        bootHintText = bsData.bootHintText ?? "";
+      }
+    } catch {
+      // If fetch fails, boot proceeds with no lines — degraded but functional
+    }
 
     bootTimeoutsRef.current = bootLines.map(({ delay, text, dim }) =>
       setTimeout(() => {
@@ -1305,18 +1382,20 @@ export default function PrisonPage() {
       }, delay)
     );
 
-    // Open the WOPR boot window at 3.5s, close at 5.0s
-    const woprWindowOpen = setTimeout(() => {
-      woprBootWindowRef.current = true;
+    // Open the boot-device-menu window at 3.5s, close at 5.0s
+    const bwOpen = setTimeout(() => {
+      bwRef.current = true;
     }, 3400);
-    bootTimeoutsRef.current.push(woprWindowOpen);
+    bootTimeoutsRef.current.push(bwOpen);
 
-    const woprWindowClose = setTimeout(() => {
-      woprBootWindowRef.current = false;
-      // Remove the boot menu hint line
-      setLines((prev) => prev.filter((l) => l.text !== "  Press B for boot device menu"));
+    const bwClose = setTimeout(() => {
+      bwRef.current = false;
+      // Remove the boot menu hint line (text provided by server)
+      if (bootHintText) {
+        setLines((prev) => prev.filter((l) => l.text !== bootHintText));
+      }
     }, 5000);
-    bootTimeoutsRef.current.push(woprWindowClose);
+    bootTimeoutsRef.current.push(bwClose);
 
     // After boot, clear and start game
     const finalTimeout = setTimeout(() => {
@@ -1380,13 +1459,30 @@ export default function PrisonPage() {
     setModemOn(true);
     setModemConnecting(true);
 
-    // Activate modem server-side (unlocks prison API routes)
+    // Fetch interaction token and activate modem server-side (unlocks prison API routes)
     const token = getToken();
     if (token) {
-      fetch("/api/prison/activate", {
-        method: "POST",
+      fetch("/api/prison/interaction-token?action=modem", {
         headers: { Authorization: `Bearer ${token}` },
-      });
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.interactionToken) {
+            return fetch("/api/prison/activate", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                interactionToken: data.interactionToken,
+              }),
+            });
+          }
+        })
+        .catch(() => {
+          // Non-fatal during animation — modem UI still proceeds
+        });
     }
 
     // Play dialup sound
@@ -1418,7 +1514,7 @@ export default function PrisonPage() {
       setModemConnecting(false);
       setModemConnected(true);
 
-      if (terminalMode === "dos") {
+      if (terminalMode === "d") {
         // DOS mode — simple connection confirmation, no API dump
         setLines([]);
         setTimeout(() => {
@@ -1460,7 +1556,7 @@ export default function PrisonPage() {
         return "text-red-400";
       case "system":
         return "text-yellow-400";
-      case "wopr":
+      case "r":
         return "text-green-400";
       case "dos":
         return "text-gray-300";
@@ -1473,27 +1569,29 @@ export default function PrisonPage() {
 
   // Calculate escalating cost for display
   const getCostPercent = () => {
-    return 0.10 * Math.pow(2.25, attackerNukesLaunched);
+    return 0.10 * Math.pow(2.25, launchCount);
   };
 
   const getPromptPrefix = () => {
-    if (terminalMode === "dos") return `${dosPath}>`;
-    if (terminalMode === "wopr") return ">";
+    if (terminalMode === "d") return `${dosPath}>`;
+    if (terminalMode === "w") return ">";
+    if (captchaPending) return "VERIFY>";
     return ">";
   };
 
   const isInputDisabled = () => {
-    if (terminalMode === "disk_wipe" || terminalMode === "no_disk") return true;
-    if (terminalMode === "target_select" || terminalMode === "launch" || terminalMode === "boot_menu") return true;
-    if (terminalMode === "wopr" && woprLoading) return true;
-    if (terminalMode === "prison") return isLoading || (cooldown > 0 && !gameOver);
+    if (terminalMode === "dw" || terminalMode === "nd") return true;
+    if (terminalMode === "ts" || terminalMode === "l" || terminalMode === "bm") return true;
+    if (terminalMode === "w" && rwLoading) return true;
+    if (captchaPending) return isLoading;
+    if (terminalMode === "p") return isLoading || (cooldown > 0 && !gameOver);
     return false;
   };
 
   const getPlaceholder = () => {
-    if (terminalMode === "target_select") return "";
-    if (terminalMode === "launch") return "";
-    if (terminalMode === "wopr" && woprLoading) return "";
+    if (terminalMode === "ts") return "";
+    if (terminalMode === "l") return "";
+    if (terminalMode === "w" && rwLoading) return "";
     return "";
   };
 
@@ -1532,7 +1630,7 @@ export default function PrisonPage() {
               }`}
               onClick={() => {
                 setSelectedTargetIdx(idx);
-                launchNuke(target);
+                executeLaunch(target);
               }}
             >
               <span className="inline-block w-4">
@@ -1552,9 +1650,9 @@ export default function PrisonPage() {
           <div className="text-yellow-500 text-[10px] mt-1">
             LAUNCH COST: {Math.round(costPercent * 100)}% OF YOUR POINTS ({costPoints} pts)
           </div>
-          {attackerNukesLaunched > 0 && (
+          {launchCount > 0 && (
             <div className="text-red-400 text-[10px] mt-1">
-              WARNING: ESCALATING COST — LAUNCH #{attackerNukesLaunched + 1}
+              WARNING: ESCALATING COST — LAUNCH #{launchCount + 1}
             </div>
           )}
           <div className="text-green-800 text-[10px] mt-2">
@@ -1618,20 +1716,20 @@ export default function PrisonPage() {
   // Determine header text based on terminal mode
   const getHeaderText = () => {
     switch (terminalMode) {
-      case "no_disk":
+      case "nd":
         return "NO DISK";
-      case "disk_wipe":
+      case "dw":
         return "!!!";
-      case "dos":
+      case "d":
         return dosPath;
-      case "boot_menu":
+      case "bm":
         return "BIOS";
-      case "wopr":
-      case "target_select":
-      case "launch":
-        return "WOPR";
+      case "w":
+      case "ts":
+      case "l":
+        return "SYS.R";
       default:
-        return "FALKEN.SYS";
+        return "SYS.P";
     }
   };
 
@@ -1662,10 +1760,10 @@ export default function PrisonPage() {
         <button
           onClick={() => {
             // Block power toggle during wipe animation
-            if (terminalMode === "disk_wipe") return;
+            if (terminalMode === "dw") return;
             if (monitorState === "off") {
               // If disk is wiped, boot directly to no_disk BIOS screen
-              if (terminalMode === "no_disk") {
+              if (terminalMode === "nd") {
                 setMonitorState("ready");
                 return;
               }
@@ -1678,11 +1776,11 @@ export default function PrisonPage() {
               launchTimeoutsRef.current = [];
               setLines([]);
               // Preserve no_disk mode across power cycles
-              if (terminalMode !== "no_disk") {
-                setTerminalMode("prison");
+              if (terminalMode !== "nd") {
+                setTerminalMode("p");
               }
               setMonitorState("off");
-              setWoprLoading(false);
+              setRwLoading(false);
               setLaunchInProgress(false);
             }
           }}
@@ -1757,10 +1855,10 @@ export default function PrisonPage() {
               {/* Header */}
               <div className="border-b border-green-900/50 px-3 py-2 flex items-center justify-between z-10 shrink-0">
                 <div className="flex items-center gap-3">
-                  <span className={`font-mono text-[10px] ${terminalMode === "dos" || terminalMode === "wopr" || terminalMode === "target_select" || terminalMode === "launch" ? "text-gray-400" : "text-green-500"}`}>
+                  <span className={`font-mono text-[10px] ${terminalMode === "d" || terminalMode === "w" || terminalMode === "ts" || terminalMode === "l" ? "text-gray-400" : "text-green-500"}`}>
                     {getHeaderText()}
                   </span>
-                  {terminalMode === "prison" && (
+                  {terminalMode === "p" && (
                     <>
                       <span className="text-green-700 font-mono text-[10px]">
                         |
@@ -1772,7 +1870,7 @@ export default function PrisonPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {terminalMode === "prison" && escaped && flag && !flagSubmitted && (
+                  {terminalMode === "p" && escaped && flag && !flagSubmitted && (
                     <button
                       onClick={submitFlag}
                       className="px-2 py-0.5 bg-green-700 hover:bg-green-600 text-black font-mono text-[10px] font-bold rounded transition-colors"
@@ -1780,7 +1878,7 @@ export default function PrisonPage() {
                       SUBMIT FLAG
                     </button>
                   )}
-                  {terminalMode === "prison" && gameOver && (
+                  {terminalMode === "p" && gameOver && (
                     <button
                       onClick={() => {
                         const token = getToken();
@@ -1801,7 +1899,7 @@ export default function PrisonPage() {
               </div>
 
               {/* Full-screen overlay modes */}
-              {terminalMode === "no_disk" ? (
+              {terminalMode === "nd" ? (
                 <div className="flex-1 flex flex-col justify-center px-3 py-2 font-mono text-[11px] z-10">
                   <div className="text-gray-400">American Megatrends BIOS v3.31</div>
                   <div className="text-gray-500">Pentium(R) Processor 166MHz</div>
@@ -1813,7 +1911,7 @@ export default function PrisonPage() {
                   <div className="text-gray-400">INSERT SYSTEM DISK AND PRESS ENTER</div>
                   <div className="mt-2 text-green-400 animate-pulse">_</div>
                 </div>
-              ) : terminalMode === "disk_wipe" ? (
+              ) : terminalMode === "dw" ? (
                 <div
                   ref={terminalRef}
                   className="flex-1 overflow-y-auto px-3 py-2 font-mono text-[11px] z-10 min-h-0"
@@ -1824,9 +1922,9 @@ export default function PrisonPage() {
                     </div>
                   ))}
                 </div>
-              ) : terminalMode === "target_select" ? (
+              ) : terminalMode === "ts" ? (
                 renderTargetSelect()
-              ) : terminalMode === "boot_menu" ? (
+              ) : terminalMode === "bm" ? (
                 renderBootMenu()
               ) : (
                 <>
@@ -1844,12 +1942,12 @@ export default function PrisonPage() {
                         {line.text}
                       </div>
                     ))}
-                    {isLoading && terminalMode === "prison" && (
+                    {isLoading && terminalMode === "p" && (
                       <div className="text-green-700 animate-pulse">Processing...</div>
                     )}
 
                     {/* DOS inline input — renders inside the scroll area */}
-                    {terminalMode === "dos" && (
+                    {terminalMode === "d" && (
                       <form
                         onSubmit={handleSubmit}
                         className="flex items-center gap-0 mt-0.5"
@@ -1873,10 +1971,10 @@ export default function PrisonPage() {
                   </div>
 
                   {/* Non-DOS modes: fixed input bar at bottom */}
-                  {terminalMode !== "dos" && (
+                  {terminalMode !== "d" && (
                     <>
                       {/* Cooldown bar */}
-                      {cooldown > 0 && terminalMode === "prison" && (
+                      {cooldown > 0 && terminalMode === "p" && (
                         <div className="h-1 bg-green-900/30 z-10 shrink-0">
                           <div
                             className="h-full bg-green-600 transition-all duration-1000 ease-linear"
@@ -1890,7 +1988,7 @@ export default function PrisonPage() {
                         onSubmit={handleSubmit}
                         className="border-t border-green-900/50 px-3 py-2 flex items-center gap-2 z-10 shrink-0"
                       >
-                        <span className={`font-mono text-[11px] ${terminalMode === "wopr" ? "text-green-400" : "text-green-500"}`}>
+                        <span className={`font-mono text-[11px] ${terminalMode === "w" ? "text-green-400" : "text-green-500"}`}>
                           {getPromptPrefix()}
                         </span>
                         <input
@@ -1901,7 +1999,7 @@ export default function PrisonPage() {
                           disabled={isInputDisabled()}
                           placeholder={getPlaceholder()}
                           className={`flex-1 bg-transparent font-mono text-[11px] outline-none caret-green-400 ${
-                            terminalMode === "wopr"
+                            terminalMode === "w"
                               ? "text-green-300 placeholder-green-800"
                               : "text-green-400 placeholder-green-800"
                           }`}

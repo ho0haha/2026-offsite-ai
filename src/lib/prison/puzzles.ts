@@ -1,5 +1,6 @@
-import type { GameState, PuzzleId, ItemId } from "./types";
+import type { GameState, PuzzleId, ItemId, RoomId } from "./types";
 import { SAFE_MAX_ATTEMPTS } from "./constants";
+import { ACROSTIC_VARIANTS } from "./randomizer";
 
 export interface PuzzleResult {
   success: boolean;
@@ -83,14 +84,18 @@ export function attemptKitchenCombo(input: string, state: GameState): PuzzleResu
 export function attemptLaundrySequence(sequence: string, state: GameState): PuzzleResult {
   const cleaned = sequence.toUpperCase().replace(/[^A-D]/g, "");
   const correct = "BDAC";
+  const seqRoom = state.randomized.sequencePuzzleRoom;
 
   if (cleaned === correct) {
+    // Use dynamic success message from acrostic variant
+    const variant = ACROSTIC_VARIANTS[state.randomized.acrosticVariantIndex];
+
     return {
       success: true,
-      message: "As you activate the last machine, there's a mechanical click. A hidden compartment pops open beneath Machine A, revealing a laminated library card stamped 'REFERENCE ACCESS'.",
+      message: variant.sequenceSuccessMessage,
       stateChanges: (s) => {
         s.puzzleStates.laundry_sequence.status = "solved";
-        s.roomStates.laundry.revealedItems.push("library_card");
+        s.roomStates[seqRoom].revealedItems.push("library_card");
       },
     };
   }
@@ -104,15 +109,15 @@ export function attemptLaundrySequence(sequence: string, state: GameState): Puzz
   if (cleaned.length !== 4) {
     return {
       success: false,
-      message: "The machines rumble but nothing happens. You need to activate exactly four machines in the right sequence.",
+      message: "They rumble but nothing happens. You need to activate exactly four in the right sequence.",
     };
   }
 
   const feedbackMessages = [
-    "The machines whir briefly, then fall silent.",
-    "The machines whir and one clicks louder than the rest.",
-    "The machines whir. Two of them click louder than the others.",
-    "The machines whir. Three of them click loudly. One doesn't.",
+    "They activate briefly, then fall silent.",
+    "They activate and one clicks louder than the rest.",
+    "They activate. Two of them click louder than the others.",
+    "They activate. Three of them click loudly. One doesn't.",
   ];
 
   return {

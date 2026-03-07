@@ -11,6 +11,7 @@ import {
 } from "@/lib/prison/state";
 import { getOpeningNarrative } from "@/lib/prison/responses";
 import { MAX_TURNS, CHALLENGE_ID_SORT_ORDER } from "@/lib/prison/constants";
+import { verifyInteractionToken } from "@/lib/interaction-token";
 
 export async function POST(req: NextRequest) {
   const authResult = requireAuth(req);
@@ -24,6 +25,15 @@ export async function POST(req: NextRequest) {
   // Modem gate — route is invisible until modem is activated
   const modemCheck = await requireModem(participantId);
   if (modemCheck) return modemCheck;
+
+  // Parse body for bootToken (optional)
+  let bootToken: string | undefined;
+  try {
+    const body = await req.json();
+    bootToken = body?.bootToken;
+  } catch {
+    // No body or invalid JSON — that's fine for backward compat
+  }
 
   // Check for restart flag
   const url = new URL(req.url);
@@ -48,7 +58,7 @@ export async function POST(req: NextRequest) {
     const state = deserializeState(existing.state);
     return NextResponse.json({
       sessionId: existing.id,
-      output: `[Session resumed — Turn ${state.turnNumber}/${MAX_TURNS}]\n\nYou are in ${state.currentRoom.replace(/_/g, " ")}.\nType LOOK to observe your surroundings.`,
+      output: `[Session resumed — Turn ${state.turnNumber}/${MAX_TURNS}]\n\nType LOOK to observe your surroundings.`,
       turnsRemaining: MAX_TURNS - state.turnNumber,
       resumed: true,
     });
@@ -61,6 +71,35 @@ export async function POST(req: NextRequest) {
       .set({ abandonedAt: new Date().toISOString() })
       .where(eq(gameSessions.id, existing.id))
       .run();
+  }
+
+  // Require boot token for new game creation
+  if (!bootToken) {
+    console.warn(
+      `[prison/start] New game requested without bootToken for participant ${participantId}`
+    );
+    return NextResponse.json(
+      {
+        error:
+          "Missing bootToken. You must boot the monitor in-browser before starting a new game.",
+      },
+      { status: 403 }
+    );
+  }
+
+  const bootPayload = verifyInteractionToken(
+    bootToken,
+    "boot",
+    participantId
+  );
+  if (!bootPayload) {
+    console.warn(
+      `[prison/start] Invalid/expired bootToken for participant ${participantId}`
+    );
+    return NextResponse.json(
+      { error: "Invalid or expired boot token." },
+      { status: 403 }
+    );
   }
 
   // Create new session

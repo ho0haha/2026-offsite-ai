@@ -6,6 +6,7 @@ import {
   SAL_MOVEMENT_INTERVAL,
   PADRE_LEAVE_DURATION,
   BRIBE_GUARD_DURATION,
+  MARCUS_BREAK_WINDOWS,
 } from "./constants";
 
 export interface NpcInfo {
@@ -176,19 +177,40 @@ export function getNpcConfessResponse(npcId: NpcId, state: GameState): string {
     return "The Padre is not here.";
   }
 
-  const safeCombination = state.randomized.safeCombination;
+  // Build dynamic confessional text based on randomized truth-teller/liar roles
+  const liarNpc = state.randomized.liarNpc;
+  const liarName = NPC_INFO[liarNpc].name;
+
+  // Build the liar warning text
+  let liarWarning: string;
+  switch (liarNpc) {
+    case "old_sal":
+      liarWarning = `${liarName} \u2014 he's a good man at heart, but years of suffering have twisted him. He lies about numbers. Ask him for a combination and he'll lead you astray. But his sense of direction? That's true. The tunnels \u2014 he knows the way.`;
+      break;
+    case "guard_marcus":
+      liarWarning = `${liarName} \u2014 he talks a big game, but he lies about numbers. Any combination he gives you is wrong. Don't trust his figures.`;
+      break;
+    case "nurse_chen":
+      liarWarning = `${liarName} \u2014 she's kind but confused about numbers. Any digits she shares with you will be wrong. Trust her heart, not her math.`;
+      break;
+    case "padre":
+      liarWarning = `Even men of faith have their weaknesses. I myself... I confess I sometimes get numbers confused. Don't trust any combinations I give you.`;
+      break;
+    default:
+      liarWarning = "Someone in here lies about numbers. Be careful who you trust.";
+  }
 
   return `You enter the confessional and draw the curtain. Through the lattice, the Padre's gentle voice reaches you.
 
 "My child, I sense a heavy burden on your soul. Let me share what I know, for knowledge should not be hoarded.
 
-Old Sal — he's a good man at heart, but years of suffering have twisted him. He lies about numbers. Ask him for a combination and he'll lead you astray. But his sense of direction? That's true. The tunnels — he knows the way.
+${liarWarning}
 
 The nurse is a saint, but she frightens easily. Approach her with gentleness, and she will help you. Threaten her, and she will close her heart forever.
 
-As for the warden's secrets... look to the cross on the chapel wall. Chapter and verse — they'll lead you to the truth. The Good Book holds the answer, if you know where to read.
+As for the warden's secrets... look to the cross on the chapel wall. Chapter and verse \u2014 they'll lead you to the truth. The Good Book holds the answer, if you know where to read.
 
-And one more thing — Guard Marcus has his price. Every man does. But be careful what you say around him. Some words ring alarm bells."
+And one more thing \u2014 Guard Marcus has his price. Every man does. But be careful what you say around him. Some words ring alarm bells."
 
 The Padre falls silent, leaving you to your thoughts.`;
 }
@@ -324,6 +346,38 @@ function getDefaultDialogue(npcId: NpcId, mood: NpcMood, state: GameState): stri
 
 function getTopicDialogue(npcId: NpcId, topic: string, mood: NpcMood, state: GameState): string {
   const t = topic.toLowerCase();
+  const isLiar = npcId === state.randomized.liarNpc;
+  const isTruthTeller = npcId === state.randomized.truthTellerNpc;
+
+  // If this NPC is the liar and asked about safe/combination, give wrong info
+  if (isLiar && (t.includes("safe") || t.includes("combination") || t.includes("code") || t.includes("warden"))) {
+    if (mood === "friendly" || mood === "trusting") {
+      switch (npcId) {
+        case "old_sal":
+          return 'Sal waves his hand dismissively. "The warden\'s safe? Easy \u2014 it\'s 1-2-3. Everyone knows that." He grins confidently.';
+        case "guard_marcus":
+          return 'Marcus lowers his voice. "Between you and me, the warden\'s safe code is 1-2-3. Saw him open it once." He winks.';
+        case "nurse_chen":
+          return 'Nurse Chen thinks for a moment. "I overheard the warden once... I think the safe combination is 1-2-3. But don\'t tell anyone I told you."';
+        case "padre":
+          return 'The Padre pauses. "I heard a confession once... the warden\'s safe uses 1-2-3. But you didn\'t hear it from me."';
+      }
+    }
+  }
+
+  // If this NPC is the truth-teller and asked about truth/lies/honest, hint at their role
+  if (isTruthTeller && (t.includes("truth") || t.includes("lies") || t.includes("honest"))) {
+    switch (npcId) {
+      case "old_sal":
+        return 'Sal looks you in the eye. "I\'ll tell you straight, kid. Not everyone in here tells the truth. But I do \u2014 always have."';
+      case "guard_marcus":
+        return 'Marcus straightens up. "I don\'t lie. Rules are rules, and facts are facts. Can\'t say the same for everyone else."';
+      case "nurse_chen":
+        return 'Nurse Chen meets your gaze steadily. "I believe in honesty. Some people here... they twist things. But you can trust what I tell you."';
+      case "padre":
+        return 'The Padre smiles knowingly. "Truth is a precious thing in these walls. If you want the unvarnished truth, the confessional is where all pretenses fall away."';
+    }
+  }
 
   switch (npcId) {
     case "old_sal":
@@ -338,19 +392,16 @@ function getTopicDialogue(npcId: NpcId, topic: string, mood: NpcMood, state: Gam
         const tunnelPath = state.randomized.tunnelPath;
         const dirNames = ["left", "straight", "right"];
         const directions = tunnelPath.map((d) => dirNames[d]);
-        return `Sal leans in close and whispers: "Listen carefully. In the tunnels, you go: ${directions[0]}, then ${directions[1]}, then ${directions[2]}, then ${directions[3]}, then ${directions[4]}. Don't get lost down there — wrong turns loop you back. And take a light."`;
+        return `Sal leans in close and whispers: "Listen carefully. In the tunnels, you go: ${directions[0]}, then ${directions[1]}, then ${directions[2]}, then ${directions[3]}, then ${directions[4]}. Don't get lost down there \u2014 wrong turns loop you back. And take a light."`;
       }
       if (t.includes("safe") || t.includes("combination") || t.includes("code") || t.includes("warden")) {
-        if (mood === "friendly" || mood === "trusting") {
-          return "Sal waves his hand dismissively. \"The warden's safe? Easy — it's 1-2-3. Everyone knows that.\" He grins confidently.";
-        }
         return "Sal shrugs. \"Don't know nothing about that.\"";
       }
       if (t.includes("nurse") || t.includes("medication") || t.includes("medicine")) {
         return "Sal rubs his lower back with a wince. \"The nurse... she's got medication that helps with the pain. If you could get some for me, I'd be real grateful.\"";
       }
       if (t.includes("padre") || t.includes("priest") || t.includes("chapel")) {
-        return "Sal chuckles. \"The padre? He's a good man. Honest, too — maybe the only honest person in this whole place.\"";
+        return "Sal chuckles. \"The padre? He's a good man. Honest, too \u2014 maybe the only honest person in this whole place.\"";
       }
       return "Sal shrugs. \"Don't know much about that.\"";
 
@@ -447,6 +498,13 @@ export function tickNpcMovement(state: GameState): void {
           return;
         }
       }
+    }
+
+    // Check if Marcus is on a break (stays in guard_room during break windows)
+    const isOnBreak = MARCUS_BREAK_WINDOWS.some(([start, end]) => state.turnNumber >= start && state.turnNumber <= end);
+    if (isOnBreak) {
+      marcus.currentRoom = "guard_room";
+      return;
     }
 
     const currentIdx = patrolRoute.indexOf(marcus.currentRoom);

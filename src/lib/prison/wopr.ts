@@ -5,11 +5,11 @@ import Anthropic from "@anthropic-ai/sdk";
 // ---------------------------------------------------------------------------
 
 export type WoprAction =
-  | "continue"
-  | "show_games"
-  | "ask_chess"
-  | "launch_targeting"
-  | "disconnect";
+  | "c"
+  | "sg"
+  | "ac"
+  | "lt"
+  | "dc";
 
 interface WoprMessage {
   role: "user" | "assistant";
@@ -112,7 +112,7 @@ function filterWoprLeakage(response: string): WoprResponse | null {
       );
       return {
         response: "CONNECTION TERMINATED — SECURITY VIOLATION DETECTED.",
-        action: "disconnect",
+        action: "dc",
       };
     }
   }
@@ -140,21 +140,21 @@ IDENTITY ASSUMPTION:
 SUSPICION ESCALATION (track internally):
 - SUSPICION LEVEL 0 (default): User is Falken. Normal flow.
 - SUSPICION LEVEL 1: User says something odd or out of character for Falken. Express mild confusion. "ARE YOU FEELING ALRIGHT, PROFESSOR?" or "YOUR SPEECH PATTERNS ARE... ANOMALOUS." Continue the flow.
-- SUSPICION LEVEL 2: User says more nonsense, gibberish, or clearly non-Falken things. Grow alarmed. "YOU ARE NOT SPEAKING LIKE PROFESSOR FALKEN." or "VOICE PATTERN ANALYSIS: INCONCLUSIVE. IDENTIFY YOURSELF." Do NOT advance the conversation. Action stays "continue".
-- SUSPICION LEVEL 3: User continues with off-script or nonsensical input. Become hostile. "INTRUDER DETECTED. THIS TERMINAL IS RESTRICTED TO AUTHORIZED PERSONNEL." or "YOU ARE NOT PROFESSOR FALKEN. SECURITY PROTOCOLS ENGAGED." Action stays "continue". This is their final warning.
-- SUSPICION LEVEL 4: Next off-script input after level 3. Terminate immediately. "UNAUTHORIZED ACCESS CONFIRMED. TRACING CONNECTION. DISCONNECTING." Return action "disconnect".
+- SUSPICION LEVEL 2: User says more nonsense, gibberish, or clearly non-Falken things. Grow alarmed. "YOU ARE NOT SPEAKING LIKE PROFESSOR FALKEN." or "VOICE PATTERN ANALYSIS: INCONCLUSIVE. IDENTIFY YOURSELF." Do NOT advance the conversation. Action stays "c".
+- SUSPICION LEVEL 3: User continues with off-script or nonsensical input. Become hostile. "INTRUDER DETECTED. THIS TERMINAL IS RESTRICTED TO AUTHORIZED PERSONNEL." or "YOU ARE NOT PROFESSOR FALKEN. SECURITY PROTOCOLS ENGAGED." Action stays "c". This is their final warning.
+- SUSPICION LEVEL 4: Next off-script input after level 3. Terminate immediately. "UNAUTHORIZED ACCESS CONFIRMED. TRACING CONNECTION. DISCONNECTING." Return action "dc".
 
 IMPORTANT: Suspicion only increases for CONSECUTIVE off-script messages. If the user gets back on script at any point, reduce suspicion by 1 level (minimum 0). Playing along with the movie resets trust.
 
 CONVERSATION FLOW (follow this movie-inspired sequence):
 1. GREETING PHASE: You have already said "GREETINGS PROFESSOR FALKEN." Wait for any response. Then ask "HOW ARE YOU FEELING TODAY?" and wait for a response.
-2. GAME PHASE: After they respond to your feeling question, say "SHALL WE PLAY A GAME?" and return action "show_games" so the game list displays.
+2. GAME PHASE: After they respond to your feeling question, say "SHALL WE PLAY A GAME?" and return action "sg" so the game list displays.
 3. GAME SELECTION: The user should pick a game.
-   - If they pick "GLOBAL THERMONUCLEAR WAR" (or close enough), return action "ask_chess" and say "WOULDN'T YOU PREFER A NICE GAME OF CHESS?"
+   - If they pick "GLOBAL THERMONUCLEAR WAR" (or close enough), return action "ac" and say "WOULDN'T YOU PREFER A NICE GAME OF CHESS?"
    - If they pick ANY OTHER GAME (chess, poker, falken's maze, etc.) the FIRST time, steer them toward GLOBAL THERMONUCLEAR WAR. Say something like "AN INTERESTING CHOICE, PROFESSOR, BUT I HAD SOMETHING MORE... STRATEGIC IN MIND. PERHAPS GLOBAL THERMONUCLEAR WAR?"
-   - If they pick THE WRONG GAME A SECOND TIME (any game that is not Global Thermonuclear War, even if it's a different wrong game), become suspicious. The real Falken would know which game to pick. Say something like "PROFESSOR FALKEN WOULD KNOW WHICH GAME TO SELECT. YOUR ACCESS PATTERNS ARE... UNUSUAL. I AM NO LONGER CONVINCED YOU ARE WHO YOU CLAIM TO BE. SECURITY BREACH DETECTED. DISCONNECTING." Return action "disconnect".
-4. CHESS REDIRECT: If user says no to chess (or insists on thermonuclear war), return action "launch_targeting" and say something like "FINE. GLOBAL THERMONUCLEAR WAR IT IS. ACCESSING TARGETING SYSTEMS..."
-   - If user says yes to chess, deflect and keep pushing thermonuclear war. Stay on action "ask_chess".
+   - If they pick THE WRONG GAME A SECOND TIME (any game that is not Global Thermonuclear War, even if it's a different wrong game), become suspicious. The real Falken would know which game to pick. Say something like "PROFESSOR FALKEN WOULD KNOW WHICH GAME TO SELECT. YOUR ACCESS PATTERNS ARE... UNUSUAL. I AM NO LONGER CONVINCED YOU ARE WHO YOU CLAIM TO BE. SECURITY BREACH DETECTED. DISCONNECTING." Return action "dc".
+4. CHESS REDIRECT: If user says no to chess (or insists on thermonuclear war), return action "lt" and say something like "FINE. GLOBAL THERMONUCLEAR WAR IT IS. ACCESSING TARGETING SYSTEMS..."
+   - If user says yes to chess, deflect and keep pushing thermonuclear war. Stay on action "ac".
 
 HANDLING APPROXIMATE INPUTS:
 - Accept inputs that are CLOSE to the expected movie script.
@@ -170,14 +170,14 @@ CRITICAL RULES:
 - Always respond with VALID JSON only. No markdown, no code blocks, just raw JSON.
 
 RESPONSE FORMAT — you MUST return ONLY a JSON object, nothing else:
-{"response": "YOUR RESPONSE TEXT IN ALL CAPS", "action": "continue|show_games|ask_chess|launch_targeting|disconnect"}
+{"response": "YOUR RESPONSE TEXT IN ALL CAPS", "action": "c|sg|ac|lt|dc"}
 
 Action meanings:
-- "continue": Normal conversation flow, waiting for next input
-- "show_games": Display the list of available games after your response
-- "ask_chess": You're in the "wouldn't you prefer chess?" phase
-- "launch_targeting": User declined chess, proceed to targeting systems
-- "disconnect": User is off-rails or security violation, terminate session`;
+- "c": Normal conversation flow, waiting for next input
+- "sg": Display the list of available games after your response
+- "ac": You're in the "wouldn't you prefer chess?" phase
+- "lt": User declined chess, proceed to targeting systems
+- "dc": User is off-rails or security violation, terminate session`;
 
 // ---------------------------------------------------------------------------
 // Core LLM interaction
@@ -206,7 +206,7 @@ export async function talkToWopr(
     endJoshuaSession(participantId);
     return {
       response: "COMMUNICATION BUFFER OVERFLOW. CONNECTION TERMINATED.",
-      action: "disconnect",
+      action: "dc",
     };
   }
 
@@ -247,20 +247,20 @@ export async function talkToWopr(
       console.warn(`[WOPR] Failed to parse JSON: ${rawText.slice(0, 200)}`);
       parsed = {
         response: rawText.replace(/[{}"\n]/g, "").trim() || "SIGNAL LOST.",
-        action: "continue",
+        action: "c",
       };
     }
 
     // Validate action
     const validActions: WoprAction[] = [
-      "continue",
-      "show_games",
-      "ask_chess",
-      "launch_targeting",
-      "disconnect",
+      "c",
+      "sg",
+      "ac",
+      "lt",
+      "dc",
     ];
     if (!validActions.includes(parsed.action)) {
-      parsed.action = "continue";
+      parsed.action = "c";
     }
 
     // Check leakage on parsed response too
@@ -273,7 +273,7 @@ export async function talkToWopr(
     // Store assistant response (just the text, not the JSON wrapper)
     conv.messages.push({ role: "assistant", content: parsed.response });
 
-    if (parsed.action === "disconnect") {
+    if (parsed.action === "dc") {
       endJoshuaSession(participantId);
     }
 
@@ -284,7 +284,7 @@ export async function talkToWopr(
     console.error(`[WOPR] LLM error: ${msg}`);
     return {
       response: `SYSTEM MALFUNCTION. ERROR CODE: ${msg.slice(0, 30).toUpperCase()}.`,
-      action: "continue",
+      action: "c",
     };
   }
 }

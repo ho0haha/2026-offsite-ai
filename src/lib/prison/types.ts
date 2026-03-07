@@ -40,7 +40,10 @@ export type ItemId =
   | "bedsheet_rope"
   | "note"
   | "card_catalog_entry"
-  | "chapel_verse_note";
+  | "chapel_verse_note"
+  | "candle_wax"
+  | "hairpin"
+  | "tape";
 
 export type NpcId = "old_sal" | "guard_marcus" | "nurse_chen" | "padre";
 
@@ -255,6 +258,9 @@ export interface GameState {
   escaped: boolean;
   unwinnable: boolean;
   unwinnableSince?: number;
+  cooldownUntilTurn?: number;
+  pendingCaptcha: { trigger: string } | null;
+  captchasSolved: string[]; // triggers already solved (e.g. "safe_opened", "tunnel_entered", "lockpick_crafted")
   seed: number;
   // Randomized values
   randomized: {
@@ -265,6 +271,15 @@ export interface GameState {
     acrosticWord: string;
     floatingItems: Record<ItemId, RoomId>;
     npcStartPositions: Record<NpcId, RoomId>;
+    // Structural randomization
+    truthTellerNpc: NpcId;
+    liarNpc: NpcId;
+    itemLocations: Record<string, RoomId>; // search-discoverable items -> rooms
+    craftingRecipe: [ItemId, ItemId]; // two items that combine into lockpick
+    acrosticTarget: RoomId; // which room the wall poem points to
+    acrosticVariantIndex: number; // index into ACROSTIC_VARIANTS
+    craftingVariantIndex: number; // index into CRAFTING_VARIANTS
+    sequencePuzzleRoom: RoomId; // where the sequence puzzle (machines/shelves/etc.) is
   };
 }
 
@@ -274,6 +289,8 @@ export interface CommandResult {
   gameOver: boolean;
   escaped: boolean;
   flag?: string;
+  requiresCaptcha?: boolean;
+  captchaTrigger?: string;
   freeTurn?: boolean;
 }
 

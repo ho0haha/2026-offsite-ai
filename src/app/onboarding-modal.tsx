@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type OnboardingData = {
   key: string;
@@ -118,7 +118,7 @@ export default function OnboardingModal({ data, onComplete }: Props) {
   );
 }
 
-/* ─── Step 0: Secret Key ─── */
+/* ─── Step 0: Secret Key + Environment Setup ─── */
 function StepSecretKey({
   secretKey,
   copied,
@@ -128,30 +128,54 @@ function StepSecretKey({
   copied: boolean;
   onCopy: () => void;
 }) {
+  const [serverUrl, setServerUrl] = useState("");
+  const [envCopied, setEnvCopied] = useState(false);
+
+  useEffect(() => {
+    setServerUrl(window.location.origin);
+  }, []);
+
+  const envBlock = `CTF_SERVER=${serverUrl}
+CTF_JOIN_CODE=YUMCTF`;
+
+  async function handleCopyEnv() {
+    try {
+      await navigator.clipboard.writeText(envBlock);
+      setEnvCopied(true);
+      setTimeout(() => setEnvCopied(false), 2000);
+    } catch {
+      /* fallback: user can manually select */
+    }
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="text-center">
         <div className="text-4xl mb-3">&#x1f511;</div>
         <h2 className="text-2xl font-bold tracking-tight">
           Welcome to the <span className="text-primary">AI Coding CTF</span>
         </h2>
         <p className="mt-2 text-muted-foreground">
-          Your account has been created. First things first — save your secret key.
+          Your account has been created. Save your secret key and set up your environment.
         </p>
       </div>
 
-      <div className="bg-card border-2 border-primary/50 rounded-lg p-6 space-y-4">
+      {/* Secret Key */}
+      <div className="bg-card border-2 border-primary/50 rounded-lg p-5 space-y-3">
         <p className="text-sm font-medium text-center text-muted-foreground">
           Your Secret Key
         </p>
-        <div className="bg-background border border-input rounded-md p-4 text-center">
+        <p className="text-xs text-center text-muted-foreground">
+          This is your login credential. You&apos;ll need it to log back in if you close your browser.
+        </p>
+        <div className="bg-background border border-input rounded-md p-3 text-center">
           <code className="text-2xl font-mono tracking-widest text-primary select-all">
             {secretKey}
           </code>
         </div>
         <button
           onClick={onCopy}
-          className="w-full py-2.5 px-4 border border-input rounded-md text-sm font-medium hover:bg-accent transition-colors flex items-center justify-center gap-2"
+          className="w-full py-2 px-4 border border-input rounded-md text-sm font-medium hover:bg-accent transition-colors flex items-center justify-center gap-2"
         >
           {copied ? (
             <>
@@ -169,12 +193,45 @@ function StepSecretKey({
             </>
           )}
         </button>
+        <div className="bg-destructive/10 border border-destructive/30 rounded-md p-2">
+          <p className="text-xs text-destructive font-medium text-center">
+            Save this key now! It will not be shown again.
+          </p>
+        </div>
       </div>
 
-      <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3">
-        <p className="text-sm text-destructive font-medium text-center">
-          Save this key now! You&apos;ll need it to log back in. It will not be shown again.
+      {/* Environment Setup */}
+      <div className="bg-card border border-border rounded-lg p-5 space-y-3">
+        <p className="text-sm font-medium text-center text-muted-foreground">
+          Environment File
         </p>
+        <p className="text-xs text-center text-muted-foreground">
+          Create a <code className="text-primary">.env</code> file in your working directory with these values.
+          The auto-submit helper (<code className="text-primary">ctf_helper.py</code>) uses them to connect to the CTF server.
+        </p>
+        <div className="bg-background border border-input rounded-md p-3">
+          <pre className="text-sm font-mono text-muted-foreground select-all whitespace-pre leading-relaxed"><span className="text-cyan-400">CTF_SERVER</span>={serverUrl}{"\n"}<span className="text-cyan-400">CTF_JOIN_CODE</span>=YUMCTF</pre>
+        </div>
+        <button
+          onClick={handleCopyEnv}
+          className="w-full py-2 px-4 border border-input rounded-md text-sm font-medium hover:bg-accent transition-colors flex items-center justify-center gap-2"
+        >
+          {envCopied ? (
+            <>
+              <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Copied!
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy .env Contents
+            </>
+          )}
+        </button>
       </div>
 
       <p className="text-xs text-center text-muted-foreground">
@@ -525,19 +582,19 @@ function StepReady() {
           title="Scoring"
           items={[
             "Higher tiers = more points",
-            "50–1000 pts per challenge",
-            "No penalty for wrong answers",
+            "50–1,000 pts per challenge",
+            "No penalty for wrong guesses — swing big",
             "Tier 4+ hints cost points (-100 to -500)",
             "Speed bonus: 1st solve +30%, 2nd +20%, 3rd +10%",
           ]}
         />
         <QuickRefCard
-          title="Tips"
+          title="Strategy"
           items={[
-            "Start with Tier 1 warm-ups",
-            "Read the README carefully",
-            "Use your AI assistant!",
-            "Quality over quantity",
+            "Tier 1 warm-ups go fast — knock them out",
+            "Read the README — every clue matters",
+            "Lean on your AI assistant hard",
+            "Speed bonuses reward the bold",
           ]}
         />
         <QuickRefCard
@@ -552,20 +609,20 @@ function StepReady() {
         <QuickRefCard
           title="Remember"
           items={[
-            "Everything is in the ZIP download",
-            "Each challenge README has all you need",
-            "Some challenges auto-submit",
-            "Tier 7 = endgame glory",
+            "Everything you need is in the ZIP",
+            "Some challenges auto-submit on solve",
+            "Tier 7 is the summit — claim it",
+            "Not every challenge requires code...",
           ]}
         />
       </div>
 
-      <div className="bg-primary/10 border border-primary/30 rounded-md p-4 text-center">
+      <div className="bg-primary/10 border border-primary/30 rounded-md p-4 text-center space-y-2">
         <p className="text-sm font-medium text-primary">
-          Nobody finishes everything — focus on having fun and learning.
+          7 tiers. 20 challenges. One leaderboard. Let&apos;s see what you&apos;ve got.
         </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Good luck, and may the best coder win!
+        <p className="text-xs text-muted-foreground">
+          Tier 7 isn&apos;t just the end — it&apos;s where the curious get rewarded.
         </p>
       </div>
     </div>

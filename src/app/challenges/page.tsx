@@ -716,33 +716,47 @@ export default function ChallengesPage() {
                         <p className="text-xs font-mono font-medium text-muted-foreground flex items-center gap-1">
                           <span className="text-yellow-500">{"//>"}</span> Hints (cost points):
                         </p>
-                        {ch.hints.map((hint, i) => (
-                          <div key={i}>
-                            {hint.revealed ? (
-                              <div className="text-xs font-mono bg-green-500/5 border border-green-500/20 p-2.5 rounded">
-                                <span className="text-green-500 mr-1">[DECODED]</span>
-                                <span className="text-muted-foreground line-through mr-2">
-                                  -{hint.cost} pts
-                                </span>
-                                <span className="text-green-300/80">
-                                  Hint {i + 1}: {hint.text}
-                                </span>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => handleRevealHint(ch.id, i, hint.cost)}
-                                disabled={revealingHint === `${ch.id}-${i}`}
-                                className="text-xs font-mono px-3 py-1.5 border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 rounded hover:bg-yellow-500/20 transition-colors disabled:opacity-50 flex items-center gap-2"
-                              >
-                                <span className="text-yellow-600">{"\u26A0"}</span>
-                                {revealingHint === `${ch.id}-${i}`
-                                  ? "Decrypting..."
-                                  : `Decrypt Hint ${i + 1} (-${hint.cost} pts)`}
-                                <span className="text-yellow-600/50">{"\uD83D\uDD12"}</span>
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                        {ch.hints.map((hint, i) => {
+                          // Check if previous hints are all revealed (sequential unlock)
+                          const previousUnlocked = ch.hints!
+                            .slice(0, i)
+                            .every((h) => h.revealed);
+                          const isLocked = !hint.revealed && !previousUnlocked;
+
+                          return (
+                            <div key={i}>
+                              {hint.revealed ? (
+                                <div className="text-xs font-mono bg-green-500/5 border border-green-500/20 p-2.5 rounded">
+                                  <span className="text-green-500 mr-1">[DECODED]</span>
+                                  <span className="text-muted-foreground line-through mr-2">
+                                    -{hint.cost} pts
+                                  </span>
+                                  <span className="text-green-300/80">
+                                    Hint {i + 1}: {hint.text}
+                                  </span>
+                                </div>
+                              ) : isLocked ? (
+                                <div className="text-xs font-mono px-3 py-1.5 border border-zinc-700/30 bg-zinc-800/30 text-zinc-600 rounded flex items-center gap-2 cursor-not-allowed">
+                                  <span>{"\uD83D\uDD12"}</span>
+                                  Hint {i + 1} — Unlock Hint {i} first
+                                  <span className="ml-auto text-zinc-700">-{hint.cost} pts</span>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleRevealHint(ch.id, i, hint.cost)}
+                                  disabled={revealingHint === `${ch.id}-${i}`}
+                                  className="text-xs font-mono px-3 py-1.5 border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 rounded hover:bg-yellow-500/20 transition-colors disabled:opacity-50 flex items-center gap-2"
+                                >
+                                  <span className="text-yellow-600">{"\u26A0"}</span>
+                                  {revealingHint === `${ch.id}-${i}`
+                                    ? "Decrypting..."
+                                    : `Decrypt Hint ${i + 1} (-${hint.cost} pts)`}
+                                  <span className="text-yellow-600/50">{"\uD83D\uDD12"}</span>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 

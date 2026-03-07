@@ -56,6 +56,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Enforce sequential unlocking: must reveal all previous hints first
+    if (hintIndex > 0) {
+      const previousReveals = await db
+        .select({ hintIndex: hintReveals.hintIndex })
+        .from(hintReveals)
+        .where(
+          and(
+            eq(hintReveals.participantId, participantId),
+            eq(hintReveals.challengeId, challengeId)
+          )
+        )
+        .all();
+
+      const revealedIndices = new Set(previousReveals.map((r) => r.hintIndex));
+      for (let i = 0; i < hintIndex; i++) {
+        if (!revealedIndices.has(i)) {
+          return NextResponse.json(
+            { error: `You must unlock Hint ${i + 1} before unlocking Hint ${hintIndex + 1}` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Check if already revealed
     const existing = await db
       .select()

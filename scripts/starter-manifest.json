@@ -86,8 +86,7 @@
       "requirements.txt",
       "ctf_helper.py",
       "feedback.csv",
-      "validate.py",
-      "ground_truth.json"
+      "validate.py"
     ]
   },
   "10": {

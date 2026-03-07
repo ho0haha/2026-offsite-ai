@@ -97,17 +97,25 @@ export async function POST(req: NextRequest) {
     .where(eq(murderSessions.id, sessionId))
     .run();
 
-  // Validate the accusation
-  const result = validateAccusation(accusation);
+  // Validate the accusation — reveal per-element feedback on final attempt
+  const isFinalAttempt = attempts >= MAX_ACCUSATION_ATTEMPTS;
+  const result = validateAccusation(accusation, isFinalAttempt);
 
   if (!result.correct) {
-    return NextResponse.json({
+    const response: Record<string, unknown> = {
       correct: false,
       message: result.message,
       correctCount: result.correctCount,
       attempts,
       maxAttempts: MAX_ACCUSATION_ATTEMPTS,
-    });
+    };
+
+    if (result.elementFeedback) {
+      response.elementFeedback = result.elementFeedback;
+      response.hint = "These are the elements you got right and wrong. Reset your session to try again with this knowledge.";
+    }
+
+    return NextResponse.json(response);
   }
 
   // Correct! Generate a CTF token for submission to the main scoreboard.

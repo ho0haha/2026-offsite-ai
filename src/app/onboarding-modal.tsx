@@ -14,7 +14,7 @@ type Props = {
   onComplete: () => void;
 };
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 export default function OnboardingModal({ data, onComplete }: Props) {
   const [step, setStep] = useState(0);
@@ -63,7 +63,8 @@ export default function OnboardingModal({ data, onComplete }: Props) {
             {step === 1 && <StepSetup />}
             {step === 2 && <StepTierSystem />}
             {step === 3 && <StepChallengeWorkflow />}
-            {step === 4 && <StepReady />}
+            {step === 4 && <StepHowToSubmit />}
+            {step === 5 && <StepReady />}
           </div>
 
           {/* Navigation */}
@@ -377,7 +378,137 @@ function WorkflowItem({
   );
 }
 
-/* ─── Step 4: Ready ─── */
+/* ─── Step 4: How to Submit ─── */
+function StepHowToSubmit() {
+  return (
+    <div className="space-y-5">
+      <div className="text-center">
+        <div className="text-4xl mb-3">&#x1f4e4;</div>
+        <h2 className="text-2xl font-bold tracking-tight">How to Submit Answers</h2>
+        <p className="mt-2 text-muted-foreground">
+          There are three types of challenges with different submission methods.
+        </p>
+      </div>
+
+      <div className="space-y-4 max-h-[340px] overflow-y-auto pr-1">
+        {/* Type 1: Flag challenges */}
+        <SubmitTypeCard
+          label="Type 1"
+          title="Flag Submission"
+          color="text-cyan-400"
+          bg="bg-cyan-500/10"
+          border="border-cyan-500/30"
+          description="Most challenges produce a flag when you solve them (e.g., the test suite prints it when all tests pass)."
+          steps={[
+            "Solve the challenge locally — the flag appears in the terminal output",
+            <>Copy the flag (looks like <code className="text-cyan-400 text-xs">FLAG&#123;...&#125;</code> or <code className="text-cyan-400 text-xs">CTF&#123;...&#125;</code>)</>,
+            "Paste it into the submission box on the challenge card and hit Submit",
+          ]}
+        />
+
+        {/* Type 2: Auto-submit challenges */}
+        <SubmitTypeCard
+          label="Type 2"
+          title="Auto-Submit (Upload Validation)"
+          color="text-green-400"
+          bg="bg-green-500/10"
+          border="border-green-500/30"
+          description="Some challenges validate your code files on the server. The test harness submits automatically when you pass."
+          steps={[
+            <>Run the validation script (e.g., <code className="text-green-400 text-xs">bash run.sh</code> or <code className="text-green-400 text-xs">python -m pytest</code>)</>,
+            <>The included <code className="text-green-400 text-xs">ctf_helper.py</code> auto-submits your files to the server</>,
+            "If auto-submit fails, a backup token is printed — paste it into the challenge card",
+          ]}
+        />
+
+        {/* Type 3: Interactive challenges */}
+        <SubmitTypeCard
+          label="Type 3"
+          title="Interactive / In-Browser"
+          color="text-amber-400"
+          bg="bg-amber-500/10"
+          border="border-amber-500/30"
+          description="A few challenges (like the murder mystery and the escape room) are played entirely in the browser. No local files needed."
+          steps={[
+            "Click the Play button on the challenge card",
+            "Interact with the challenge through the built-in interface",
+            "Completion is detected automatically — no manual flag entry required",
+          ]}
+        />
+
+        {/* Important notes */}
+        <div className="bg-muted/50 border border-border rounded-md p-3 space-y-2">
+          <p className="text-xs text-muted-foreground">
+            <strong className="text-foreground">Key point:</strong> Every challenge tells you how to submit in its README or description. When in doubt, look for a <code className="text-primary text-xs">FLAG&#123;...&#125;</code> or <code className="text-primary text-xs">CTF&#123;...&#125;</code> string in your terminal output — that&apos;s your answer.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <strong className="text-foreground">Prefer the web UI:</strong> You never need to call submission APIs directly. Everything goes through the challenge cards or the included <code className="text-primary text-xs">ctf_helper.py</code> auto-submitter.
+          </p>
+        </div>
+
+        {/* API reference for manual/advanced users */}
+        <div className="bg-muted/50 border border-border rounded-md p-3 space-y-2">
+          <p className="text-xs font-bold text-foreground uppercase tracking-wider">Advanced: Manual API Submission</p>
+          <p className="text-xs text-muted-foreground">
+            If your AI tool or workflow needs to submit programmatically, all API calls require an auth header:
+          </p>
+          <code className="block bg-background border border-input rounded-md p-2 text-[11px] font-mono text-muted-foreground select-all overflow-x-auto">
+            Authorization: Bearer &lt;your-session-token&gt;
+          </code>
+          <p className="text-xs text-muted-foreground">
+            Your session token is returned when you join (POST <code className="text-primary text-xs">/api/join</code>). Key endpoints:
+          </p>
+          <div className="space-y-1 text-[11px] font-mono text-muted-foreground">
+            <p><span className="text-cyan-400">POST</span> /api/submit <span className="text-muted-foreground/60">— submit a flag</span></p>
+            <p className="pl-4 text-[10px]">Body: <code className="text-foreground/70">&#123; &quot;challengeId&quot;: &quot;...&quot;, &quot;flag&quot;: &quot;FLAG&#123;...&#125;&quot; &#125;</code></p>
+            <p><span className="text-green-400">GET</span> /api/challenges <span className="text-muted-foreground/60">— list challenges &amp; your progress</span></p>
+            <p><span className="text-green-400">GET</span> /api/starter/&#123;N&#125;?format=zip <span className="text-muted-foreground/60">— download starter code</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubmitTypeCard({
+  label,
+  title,
+  color,
+  bg,
+  border,
+  description,
+  steps,
+}: {
+  label: string;
+  title: string;
+  color: string;
+  bg: string;
+  border: string;
+  description: string;
+  steps: React.ReactNode[];
+}) {
+  return (
+    <div className={`rounded-lg border ${border} ${bg} p-4 space-y-2`}>
+      <div className="flex items-center gap-2">
+        <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${bg} border ${border} ${color}`}>
+          {label}
+        </span>
+        <span className={`font-semibold text-sm ${color}`}>{title}</span>
+      </div>
+      <p className="text-xs text-muted-foreground">{description}</p>
+      <ol className="space-y-1 ml-1">
+        {steps.map((step, i) => (
+          <li key={i} className="text-xs text-foreground flex items-start gap-2">
+            <span className={`${color} font-bold shrink-0 w-4 text-right`}>{i + 1}.</span>
+            <span>{step}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/* ─── Step 5: Ready ─── */
 function StepReady() {
   return (
     <div className="space-y-6">

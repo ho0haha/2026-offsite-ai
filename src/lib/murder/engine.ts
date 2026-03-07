@@ -319,14 +319,43 @@ export async function talkToGroup(
 // Accusation validation
 // ---------------------------------------------------------------------------
 
-export function validateAccusation(accusation: Accusation): AccusationResult {
-  const suspect = accusation.suspect.toLowerCase().trim();
-  const method = accusation.method.toLowerCase().trim().replace(/\s+/g, "_");
-  const motive = accusation.motive.toLowerCase().trim().replace(/\s+/g, "_");
+/**
+ * Fuzzy match: checks if any keyword from the accepted list appears as a
+ * substring in the player's input (after normalization). This lets players
+ * write natural-language answers like "poisoned his whiskey with eye drops"
+ * and still match against "poison", "eye_drops", etc.
+ */
+function fuzzyMatch(
+  input: string,
+  validValues: readonly string[]
+): boolean {
+  const normalized = input.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
+  const collapsed = normalized.replace(/\s/g, ""); // "eye drops" -> "eyedrops"
 
-  const suspectCorrect = (VALID_SUSPECTS as readonly string[]).includes(suspect);
-  const methodCorrect = (VALID_METHODS as readonly string[]).includes(method);
-  const motiveCorrect = (VALID_MOTIVES as readonly string[]).includes(motive);
+  for (const valid of validValues) {
+    const v = valid.replace(/_/g, " ");
+    // exact keyword match, substring match, or collapsed match
+    if (
+      normalized === valid ||
+      normalized === v ||
+      normalized.includes(valid) ||
+      normalized.includes(v) ||
+      collapsed.includes(valid.replace(/_/g, "")) ||
+      collapsed.includes(v.replace(/\s/g, ""))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function validateAccusation(
+  accusation: Accusation,
+  isFinalAttempt: boolean = false
+): AccusationResult {
+  const suspectCorrect = fuzzyMatch(accusation.suspect, VALID_SUSPECTS);
+  const methodCorrect = fuzzyMatch(accusation.method, VALID_METHODS);
+  const motiveCorrect = fuzzyMatch(accusation.motive, VALID_MOTIVES);
 
   const correctCount =
     (suspectCorrect ? 1 : 0) +
@@ -358,7 +387,18 @@ export function validateAccusation(accusation: Accusation): AccusationResult {
       message = "Something went wrong with your accusation.";
   }
 
-  return { correct: false, correctCount, message };
+  const result: AccusationResult = { correct: false, correctCount, message };
+
+  // On the final attempt, reveal which elements were correct
+  if (isFinalAttempt) {
+    result.elementFeedback = {
+      suspect: suspectCorrect,
+      method: methodCorrect,
+      motive: motiveCorrect,
+    };
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------

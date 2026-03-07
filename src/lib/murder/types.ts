@@ -26,6 +26,12 @@ export interface AccusationResult {
   correct: boolean;
   correctCount: number;
   message: string;
+  /** Per-element feedback — only populated on the final attempt */
+  elementFeedback?: {
+    suspect: boolean;
+    method: boolean;
+    motive: boolean;
+  };
 }
 
 export interface TalkRequest {

@@ -1,8 +1,8 @@
-export const MAX_MESSAGES_PER_CHARACTER = 6;
+export const MAX_MESSAGES_PER_CHARACTER = 4;
 export const RATE_LIMIT_MS = 3000;
 export const MAX_MESSAGE_LENGTH = 500;
 export const MAX_ACCUSATION_ATTEMPTS = 3;
-export const MAX_SCENE_EXAMINATIONS = 6;
+export const MAX_SCENE_EXAMINATIONS = 4;
 export const CHALLENGE_SORT_ORDER = 18;
 export const LLM_MODEL =
   process.env.MURDER_MODEL || "claude-sonnet-4-6";

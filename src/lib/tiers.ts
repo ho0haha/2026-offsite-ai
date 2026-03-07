@@ -62,6 +62,11 @@ export async function getParticipantTierStatus(
     }
   }
 
+  // Dev flag: skip tier progression — unlock everything
+  if (process.env.DEV_SKIP_TIERS === "true") {
+    return { maxTier: 7, solvesByTier, totalByTier };
+  }
+
   // Determine max unlocked tier
   let maxTier = 1;
 

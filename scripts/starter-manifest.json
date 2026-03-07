@@ -117,6 +117,7 @@
       "README.md",
       "requirements.txt",
       "ctf_helper.py",
+      "validate_all.py",
       "challenges/challenge1/function.py",
       "challenges/challenge1/task.md",
       "challenges/challenge2/functions.py",
@@ -138,7 +139,8 @@
       "requirements.txt",
       "ctf_helper.py",
       "app/__init__.py",
-      "data/stores.csv"
+      "data/stores.csv",
+      "test_e2e.py"
     ]
   },
   "13": {

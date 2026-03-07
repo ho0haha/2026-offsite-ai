@@ -2,6 +2,8 @@ node_modules/
 .next/
 data/*
 !data/starter-bundles/
+!data/ground_truth/
+!data/stubs/
 .env*.local
 *.tsbuildinfo
 /challenges/

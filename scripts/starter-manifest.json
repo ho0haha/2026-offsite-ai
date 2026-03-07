@@ -58,35 +58,6 @@
     ]
   },
   "7": {
-    "dir": "11-prompt-craftsman",
-    "include": [
-      "README.md",
-      "requirements.txt",
-      "ctf_helper.py",
-      "challenges/challenge1/function.py",
-      "challenges/challenge1/task.md",
-      "challenges/challenge2/functions.py",
-      "challenges/challenge2/task.md",
-      "challenges/challenge3/slow_function.py",
-      "challenges/challenge3/task.md",
-      "challenges/challenge4/algorithm.py",
-      "challenges/challenge4/task.md",
-      "challenges/challenge5/new_schema.py",
-      "challenges/challenge5/old_schema.py",
-      "challenges/challenge5/task.md",
-      "outputs/.gitkeep"
-    ]
-  },
-  "8": {
-    "dir": "09-smart-feedback-sorter",
-    "include": [
-      "README.md",
-      "requirements.txt",
-      "ctf_helper.py",
-      "feedback.csv"
-    ]
-  },
-  "9": {
     "dir": "07-spec-builder",
     "include": [
       "README.md",
@@ -95,7 +66,7 @@
       "brief.md"
     ]
   },
-  "10": {
+  "8": {
     "dir": "08-ai-menu-assistant",
     "include": [
       "README.md",
@@ -104,7 +75,16 @@
       "menu.json"
     ]
   },
-  "11": {
+  "9": {
+    "dir": "09-smart-feedback-sorter",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "feedback.csv"
+    ]
+  },
+  "10": {
     "dir": "10-context-is-king",
     "include": [
       "README.md",
@@ -123,6 +103,26 @@
       "restaurant_system/reporting.py",
       "restaurant_system/utils.py",
       "restaurant_system/validators.py"
+    ]
+  },
+  "11": {
+    "dir": "11-prompt-craftsman",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "ctf_helper.py",
+      "challenges/challenge1/function.py",
+      "challenges/challenge1/task.md",
+      "challenges/challenge2/functions.py",
+      "challenges/challenge2/task.md",
+      "challenges/challenge3/slow_function.py",
+      "challenges/challenge3/task.md",
+      "challenges/challenge4/algorithm.py",
+      "challenges/challenge4/task.md",
+      "challenges/challenge5/new_schema.py",
+      "challenges/challenge5/old_schema.py",
+      "challenges/challenge5/task.md",
+      "outputs/.gitkeep"
     ]
   },
   "12": {
@@ -174,6 +174,7 @@
     "include": [
       "README.md",
       "requirements.txt",
+      "ctf_helper.py",
       "agent_template.py",
       "maze_server.py"
     ]

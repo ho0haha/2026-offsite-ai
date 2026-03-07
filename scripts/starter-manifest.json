@@ -63,7 +63,10 @@
       "README.md",
       "requirements.txt",
       "ctf_helper.py",
-      "brief.md"
+      "brief.md",
+      "prd_validator.py",
+      "test_implementation.py",
+      "validate.sh"
     ]
   },
   "8": {
@@ -72,7 +75,8 @@
       "README.md",
       "requirements.txt",
       "ctf_helper.py",
-      "menu.json"
+      "menu.json",
+      "test_chatbot.py"
     ]
   },
   "9": {
@@ -81,7 +85,9 @@
       "README.md",
       "requirements.txt",
       "ctf_helper.py",
-      "feedback.csv"
+      "feedback.csv",
+      "validate.py",
+      "ground_truth.json"
     ]
   },
   "10": {
@@ -102,7 +108,9 @@
       "restaurant_system/payment_service.py",
       "restaurant_system/reporting.py",
       "restaurant_system/utils.py",
-      "restaurant_system/validators.py"
+      "restaurant_system/validators.py",
+      "tests/__init__.py",
+      "tests/test_loyalty.py"
     ]
   },
   "11": {

@@ -85,8 +85,7 @@
       "README.md",
       "requirements.txt",
       "ctf_helper.py",
-      "feedback.csv",
-      "validate.py"
+      "feedback.csv"
     ]
   },
   "10": {

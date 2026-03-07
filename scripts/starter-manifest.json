@@ -187,6 +187,18 @@
       "maze_server.py"
     ]
   },
+  "18": {
+    "dir": "18-only-murders-at-127.0.0.1",
+    "include": ["README.md"]
+  },
+  "19": {
+    "dir": "19-roy-g-biv",
+    "include": [
+      "README.md",
+      "requirements.txt",
+      "spectrum.rgbiv"
+    ]
+  },
   "17": {
     "dir": "17-gauntlet-sprint",
     "include": [
@@ -234,5 +246,9 @@
       "gauntlet/10_stream/solution.py",
       "gauntlet/10_stream/test_stream.py"
     ]
+  },
+  "20": {
+    "dir": "20-prison-break",
+    "include": ["README.md"]
   }
 }
